@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:rexplore/components/my_textfield.dart';
 import 'package:rexplore/components/my_button.dart';
+import 'package:rexplore/pages/login_page.dart';
 
 class RegisterPage extends StatelessWidget {
   RegisterPage({super.key});
@@ -90,10 +91,17 @@ class RegisterPage extends StatelessWidget {
                 Text('Already have an account?',
                     style: TextStyle(color: Colors.grey[700])),
                 const SizedBox(width: 6),
-                Text(
-                  'Sign In',
-                  style: TextStyle(
-                      color: Colors.blue, fontWeight: FontWeight.bold),
+                TextButton(
+                  style: TextButton.styleFrom(
+                      textStyle: const TextStyle(
+                          color: Colors.blue, fontWeight: FontWeight.bold)),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => LoginPage()),
+                    );
+                  },
+                  child: const Text('Sign up'),
                 ),
               ])
             ]),
