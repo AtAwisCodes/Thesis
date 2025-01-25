@@ -11,12 +11,6 @@ class MyButton extends StatelessWidget {
       margin: EdgeInsets.symmetric(horizontal: 25),
       decoration: BoxDecoration(
           color: Colors.blueAccent, borderRadius: BorderRadius.circular(20)),
-      child: Center(
-        child: Text(
-          'Sign In',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-      ),
     );
   }
 }

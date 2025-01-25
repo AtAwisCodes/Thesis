@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:rexplore/components/my_button.dart';
 import 'package:rexplore/components/my_textfield.dart';
 import 'package:rexplore/components/square_tile.dart';
+import 'package:rexplore/pages/forgotPass_page.dart';
 import 'package:rexplore/pages/register_page.dart';
 
 class LoginPage extends StatelessWidget {
@@ -81,10 +82,19 @@ class LoginPage extends StatelessWidget {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    Text(
-                      'Forgot Password?',
-                      style: TextStyle(color: Colors.grey[600]),
-                    ),
+                    TextButton(
+                      style: TextButton.styleFrom(
+                        textStyle: const TextStyle(color: Colors.grey),
+                      ),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) => ForgotPassword()),
+                        );
+                      },
+                      child: const Text('Forgot Password?'),
+                    )
                   ],
                 ),
               ),
@@ -153,7 +163,7 @@ class LoginPage extends StatelessWidget {
                       MaterialPageRoute(builder: (context) => RegisterPage()),
                     );
                   },
-                  child: const Text('Sign in'),
+                  child: const Text('Sign up'),
                 ),
               ])
             ]),
