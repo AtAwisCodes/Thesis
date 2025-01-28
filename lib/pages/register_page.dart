@@ -4,7 +4,8 @@ import 'package:rexplore/components/my_button.dart';
 import 'package:rexplore/pages/login_page.dart';
 
 class RegisterPage extends StatelessWidget {
-  RegisterPage({super.key});
+  final Function()? onTap;
+  RegisterPage({super.key, required this.onTap});
 
   final usernameController = TextEditingController();
   final passwordController = TextEditingController();
@@ -79,6 +80,7 @@ class RegisterPage extends StatelessWidget {
 
               //Create Account button
               MyButton(
+                text: "Create Account",
                 onTap: createAccount,
               ),
 
@@ -91,17 +93,15 @@ class RegisterPage extends StatelessWidget {
                 Text('Already have an account?',
                     style: TextStyle(color: Colors.grey[700])),
                 const SizedBox(width: 6),
-                TextButton(
-                  style: TextButton.styleFrom(
-                      textStyle: const TextStyle(
-                          color: Colors.blue, fontWeight: FontWeight.bold)),
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => LoginPage()),
-                    );
-                  },
-                  child: const Text('Sign in'),
+                GestureDetector(
+                  onTap: onTap,
+                  child: const Text(
+                    'Register now',
+                    style: TextStyle(
+                      color: Colors.blue,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
               ])
             ]),

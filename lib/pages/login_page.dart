@@ -6,7 +6,8 @@ import 'package:rexplore/pages/forgotPass_page.dart';
 import 'package:rexplore/pages/register_page.dart';
 
 class LoginPage extends StatelessWidget {
-  LoginPage({super.key});
+  final Function()? onTap;
+  LoginPage({super.key, required this.onTap});
 
 // text editting controllers
   final usernameController = TextEditingController();
@@ -105,6 +106,7 @@ class LoginPage extends StatelessWidget {
 
               // button
               MyButton(
+                text: "Sign In",
                 onTap: createAccount,
               ),
 
@@ -153,17 +155,15 @@ class LoginPage extends StatelessWidget {
                 Text('Don\'t have an account yet?',
                     style: TextStyle(color: Colors.grey[700])),
                 const SizedBox(width: 6),
-                TextButton(
-                  style: TextButton.styleFrom(
-                      textStyle: const TextStyle(
-                          color: Colors.blue, fontWeight: FontWeight.bold)),
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => RegisterPage()),
-                    );
-                  },
-                  child: const Text('Sign up'),
+                GestureDetector(
+                  onTap: onTap,
+                  child: const Text(
+                    'Register now',
+                    style: TextStyle(
+                      color: Colors.blue,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
               ])
             ]),
