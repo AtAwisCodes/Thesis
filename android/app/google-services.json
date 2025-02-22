@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "265429004049",
+    "project_id": "rexplore-61772",
+    "storage_bucket": "rexplore-61772.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:265429004049:android:c94a92d3d98d675b9766b0",
+        "android_client_info": {
+          "package_name": "com.example.rexplore"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBvM47KHsQaFsg09B-FohWMDTRCU_BsLYQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
