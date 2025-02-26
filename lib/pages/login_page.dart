@@ -1,12 +1,14 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:rexplore/components/my_button.dart';
 import 'package:rexplore/components/my_textfield.dart';
 import 'package:rexplore/components/square_tile.dart';
+import 'package:rexplore/services/auth_service.dart';
 
 class LoginPage extends StatefulWidget {
   final Function()? onTap;
-  LoginPage({super.key, this.onTap});
+  const LoginPage({super.key, required this.onTap});
 
   @override
   State<LoginPage> createState() => _LoginPageState();
@@ -18,7 +20,7 @@ class _LoginPageState extends State<LoginPage> {
   final passwordController = TextEditingController();
 
 //Create Account button
-  void createAccount() async {
+  void signInUser() async {
     //loading screen
     showDialog(
       context: context,
@@ -30,42 +32,32 @@ class _LoginPageState extends State<LoginPage> {
     );
 
     //Email&Password Validation
-    Navigator.pop(context);
     try {
       await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: emailController.text,
         password: passwordController.text,
       );
-      //pop loading screen
       Navigator.pop(context);
-    } on FirebaseAuthException catch (e) {
+    } on FirebaseAuthException {
       Navigator.pop(context);
-      if (e.code == 'user-not-found') {
-        wrongEmailMessage();
-      } else if (e.code == 'wrong password') {
-        wrongPasswordMessage();
-      }
+      //show error message
+      showErrorMessage("Some information not matched in our system");
     }
   }
 
 //Notification para sa maling email at password
-  void wrongEmailMessage() {
+  void showErrorMessage(String message) {
     showDialog(
       context: context,
       builder: (context) {
-        return const AlertDialog(
-          title: Text('Incorrect Email'),
-        );
-      },
-    );
-  }
-
-  void wrongPasswordMessage() {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return const AlertDialog(
-          title: Text('Incorrect Password'),
+        return AlertDialog(
+          backgroundColor: Colors.deepPurple,
+          title: Center(
+            child: Text(
+              message.toString(),
+              style: const TextStyle(color: Colors.white),
+            ),
+          ),
         );
       },
     );
@@ -81,17 +73,18 @@ class _LoginPageState extends State<LoginPage> {
             child:
                 Column(mainAxisAlignment: MainAxisAlignment.center, children: [
               const SizedBox(
-                height: 30,
+                height: 50,
               ),
 
               //logo
-              const Icon(
-                Icons.local_car_wash,
-                size: 100,
+              const Image(
+                image: AssetImage(
+                  'lib/icons/ReXplore.png',
+                ),
               ),
 
               const SizedBox(
-                height: 50,
+                height: 25,
               ),
 
               //Welcome
@@ -133,6 +126,19 @@ class _LoginPageState extends State<LoginPage> {
                 height: 8,
               ),
 
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 25.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    Text(
+                      'Forgot Password?',
+                      style: TextStyle(color: Colors.grey[600]),
+                    )
+                  ],
+                ),
+              ),
+
               const SizedBox(
                 height: 10,
               ),
@@ -140,7 +146,7 @@ class _LoginPageState extends State<LoginPage> {
               // Sign in button
               MyButton(
                 text: "Sign In",
-                onTap: createAccount,
+                onTap: signInUser,
               ),
 
               const SizedBox(
@@ -176,7 +182,11 @@ class _LoginPageState extends State<LoginPage> {
               // google logo
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
-                children: [SquareTile(imagePath: 'lib/icons/Google.png')],
+                children: [
+                  SquareTile(
+                      onTap: () => AuthService().signInWithGoogle(),
+                      imagePath: 'lib/icons/Google.png')
+                ],
               ),
 
               const SizedBox(

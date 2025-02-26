@@ -1,31 +1,62 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
-class HomePage extends StatelessWidget {
-  HomePage({super.key});
+class HomePage extends StatefulWidget {
+  const HomePage({super.key});
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
 
   final user = FirebaseAuth.instance.currentUser!;
 
-  void signUserOut() {
-    FirebaseAuth.instance.signOut();
-  }
+void signUserOut() {
+  FirebaseAuth.instance.signOut();
+}
 
+class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        title: const Text(''),
         actions: [
-          IconButton(
-            onPressed: signUserOut,
-            icon: Icon(Icons.logout),
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 17),
+            child: SizedBox(
+              width: 40,
+              height: 40,
+              child: const CircleAvatar(
+                backgroundImage: AssetImage('lib/icons/ReXplore.png'),
+              ),
+            ),
           )
         ],
       ),
-      body: Center(
-          child: Text(
-        "Welcome! ${user.email!}",
-        style: TextStyle(fontSize: 20),
-      )),
+      drawer: Drawer(
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            UserAccountsDrawerHeader(
+              accountName: const Text('Louis'),
+              accountEmail: const Text('libusadal@gmail.com'),
+              currentAccountPicture: Container(
+                decoration: BoxDecoration(
+                  borderRadius: const BorderRadius.all(Radius.circular(50)),
+                  border: Border.all(width: 2, color: Colors.blueAccent),
+                ),
+                child: const CircleAvatar(
+                  backgroundImage: AssetImage('lib/icons/ReXplore.png'),
+                ),
+              ),
+            ),
+            ListTile(
+              title: const Text('Logout'),
+              onTap: signUserOut,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -6,7 +6,9 @@ class FirebaseService {
   FirebaseService();
 
   Future<bool> addUser() async {
-    Map<String, dynamic> userData = {'name': 'Louis',};
+    Map<String, dynamic> userData = {
+      'name': 'Louis',
+    };
     try {
       await _db.collection('count').add(userData);
       return true;

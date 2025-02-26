@@ -1,17 +1,68 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:rexplore/components/my_textfield.dart';
 import 'package:rexplore/components/my_button.dart';
+import 'package:rexplore/components/square_tile.dart';
+import 'package:rexplore/services/auth_service.dart';
 
-
-class RegisterPage extends StatelessWidget {
+class RegisterPage extends StatefulWidget {
   final Function()? onTap;
-  RegisterPage({super.key, required this.onTap});
+  const RegisterPage({super.key, required this.onTap});
 
-  final usernameController = TextEditingController();
+  @override
+  State<RegisterPage> createState() => _RegisterPageState();
+}
+
+class _RegisterPageState extends State<RegisterPage> {
+  final emailController = TextEditingController();
   final passwordController = TextEditingController();
   final confirmPasswordController = TextEditingController();
 
-  void createAccount() {}
+  void createAccount() async {
+    //loading screen
+    showDialog(
+      context: context,
+      builder: (context) {
+        return const Center(
+          child: CircularProgressIndicator(),
+        );
+      },
+    );
+    //try creating the user
+    try {
+      if (passwordController.text == confirmPasswordController.text) {
+        await FirebaseAuth.instance.createUserWithEmailAndPassword(
+          email: emailController.text,
+          password: passwordController.text,
+        );
+        //pop loading screen
+        Navigator.pop(context);
+      } else {
+        showErrorMessage("Passwords don't match!");
+      }
+    } on FirebaseAuthException catch (e) {
+      Navigator.pop(context);
+      //show error message
+      showErrorMessage(e.code);
+    }
+  }
+
+  void showErrorMessage(String message) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: Colors.deepPurple,
+          title: Center(
+            child: Text(
+              message,
+              style: const TextStyle(color: Colors.white),
+            ),
+          ),
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -23,13 +74,12 @@ class RegisterPage extends StatelessWidget {
             child:
                 Column(mainAxisAlignment: MainAxisAlignment.center, children: [
               SizedBox(
-                height: 30,
+                height: 50,
               ),
 
               //Logo
-              Icon(
-                Icons.access_time_filled_outlined,
-                size: 100,
+              Image(
+                image: AssetImage('lib/icons/ReXplore.png'),
               ),
 
               //Welcome text
@@ -47,7 +97,7 @@ class RegisterPage extends StatelessWidget {
 
               //Username textbox
               MyTextfield(
-                controller: usernameController,
+                controller: emailController,
                 hintText: 'Email',
                 obscureText: false,
               ),
@@ -83,6 +133,45 @@ class RegisterPage extends StatelessWidget {
                 text: "Create Account",
                 onTap: createAccount,
               ),
+              const SizedBox(
+                height: 30,
+              ),
+
+              // or sign in with
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 25.0),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Divider(
+                        thickness: 1,
+                        color: Colors.black,
+                      ),
+                    ),
+                    Text('Or continue with'),
+                    Expanded(
+                      child: Divider(
+                        thickness: 1,
+                        color: Colors.black,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(
+                height: 30,
+              ),
+
+              // google logo
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  SquareTile(
+                      onTap: () => AuthService().signInWithGoogle(),
+                      imagePath: 'lib/icons/Google.png')
+                ],
+              ),
 
               const SizedBox(
                 height: 30,
@@ -94,9 +183,9 @@ class RegisterPage extends StatelessWidget {
                     style: TextStyle(color: Colors.grey[700])),
                 const SizedBox(width: 6),
                 GestureDetector(
-                  onTap: onTap,
+                  onTap: widget.onTap,
                   child: const Text(
-                    'Register now',
+                    'Login now',
                     style: TextStyle(
                       color: Colors.blue,
                       fontWeight: FontWeight.bold,
