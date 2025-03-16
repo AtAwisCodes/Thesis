@@ -1,5 +1,4 @@
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:rexplore/components/my_button.dart';
 import 'package:rexplore/components/my_textfield.dart';
@@ -89,10 +88,10 @@ class _LoginPageState extends State<LoginPage> {
 
               //Welcome
               Text(
-                'Welcome!',
+                'Welcome back!',
                 style: TextStyle(
                   color: Colors.black,
-                  fontSize: 50,
+                  fontSize: 40,
                   fontWeight: FontWeight.bold,
                 ),
               ),

@@ -1,10 +1,10 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
+import 'package:provider/provider.dart';
 import 'package:rexplore/firebase_service.dart';
-import 'package:rexplore/pages/auth_page.dart';
-import 'package:rexplore/pages/home_page.dart';
-import 'package:rexplore/pages/login_page.dart';
+import 'package:rexplore/pages/landing_page.dart';
+import 'package:rexplore/viewmodel/yt_videoview_model.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -20,9 +20,15 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      home: AuthPage(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider<YtVideoviewModel>(
+            create: (_) => YtVideoviewModel())
+      ],
+      child: MaterialApp(
+        debugShowCheckedModeBanner: false,
+        home: LandingPage(),
+      ),
     );
   }
 }

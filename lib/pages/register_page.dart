@@ -84,8 +84,8 @@ class _RegisterPageState extends State<RegisterPage> {
 
               //Welcome text
               Text(
-                'Welcome back!',
-                style: TextStyle(fontSize: 40, fontWeight: FontWeight.bold),
+                'Welcome!',
+                style: TextStyle(fontSize: 50, fontWeight: FontWeight.bold),
               ),
 
               //Caption text
