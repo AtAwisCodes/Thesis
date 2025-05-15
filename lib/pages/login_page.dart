@@ -64,40 +64,66 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-        backgroundColor: Colors.white,
-        body: SafeArea(
-            child: Center(
+    return Dialog(
+        backgroundColor: Colors.transparent,
+        child: Stack(
+          children: [
+            CardDialog(),
+            Positioned(
+                top: 0,
+                right: 15,
+                height: 28,
+                width: 28,
+                child: OutlinedButton(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                    },
+                    style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.all(8),
+                        shape: const CircleBorder(),
+                        backgroundColor: Colors.transparent,
+                        side: BorderSide(color: Colors.transparent)),
+                    child: Icon(
+                      Icons.cancel,
+                      size: 30,
+                    )))
+          ],
+        ));
+  }
+
+  Container CardDialog() {
+    return Container(
+        padding: const EdgeInsets.symmetric(
+          vertical: 8,
+          horizontal: 32,
+        ),
+        margin: const EdgeInsets.all(15),
+        height: 500,
+        decoration: BoxDecoration(
+          color: const Color(0xff2A303E),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Center(
           child: SingleChildScrollView(
             child:
                 Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-              const SizedBox(
-                height: 50,
-              ),
-
-              //logo
-              const Image(
-                image: AssetImage(
-                  'lib/icons/ReXplore.png',
-                ),
-              ),
-
-              const SizedBox(
-                height: 25,
-              ),
-
               //Welcome
               Text(
-                'Welcome back!',
+                'Welcome!',
                 style: TextStyle(
-                  color: Colors.black,
+                  color: Colors.white,
                   fontSize: 40,
                   fontWeight: FontWeight.bold,
                 ),
               ),
 
               //Create your account
-              Text('Login to your account!'),
+              Text(
+                'Login to your account!',
+                style: TextStyle(
+                  color: Colors.white,
+                ),
+              ),
 
               const SizedBox(
                 height: 25,
@@ -160,14 +186,17 @@ class _LoginPageState extends State<LoginPage> {
                     Expanded(
                       child: Divider(
                         thickness: 1,
-                        color: Colors.black,
+                        color: Colors.white,
                       ),
                     ),
-                    Text('Or continue with'),
+                    Text(
+                      'Or continue with',
+                      style: TextStyle(color: Colors.white),
+                    ),
                     Expanded(
                       child: Divider(
                         thickness: 1,
-                        color: Colors.black,
+                        color: Colors.white,
                       ),
                     ),
                   ],
@@ -195,21 +224,21 @@ class _LoginPageState extends State<LoginPage> {
               //already have an account
               Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                 Text('Don\'t have an account yet?',
-                    style: TextStyle(color: Colors.grey[700])),
+                    style: TextStyle(color: Colors.grey[700], fontSize: 11)),
                 const SizedBox(width: 6),
                 GestureDetector(
                   onTap: widget.onTap,
                   child: const Text(
                     'Register now',
                     style: TextStyle(
-                      color: Colors.blue,
-                      fontWeight: FontWeight.bold,
-                    ),
+                        color: Colors.blue,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12),
                   ),
                 ),
               ])
             ]),
           ),
-        )));
+        ));
   }
 }

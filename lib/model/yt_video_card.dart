@@ -16,6 +16,7 @@ class YoutubeVideoCard extends StatelessWidget {
         alignment: AlignmentDirectional.center,
         children: [
           Card(
+            color: Colors.transparent,
             margin: EdgeInsets.all(10),
             elevation: 5,
             child: Column(
@@ -26,21 +27,23 @@ class YoutubeVideoCard extends StatelessWidget {
                   padding: const EdgeInsets.all(8.0),
                   child: Text(
                     ytVideo.videoTitle,
-                    style: TextStyle(fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                        color: Colors.white, fontWeight: FontWeight.bold),
                   ),
                 ),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 8.0),
                   child: Text(
                     ytVideo.channelName,
-                    style: TextStyle(color: Colors.grey),
+                    style: TextStyle(color: Colors.white),
                   ),
                 ),
+                const SizedBox(height: 20),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 8.0),
                   child: Text(
                     ytVideo.viewsCount,
-                    style: TextStyle(color: Colors.grey),
+                    style: TextStyle(color: Colors.white),
                   ),
                 )
               ],
@@ -51,8 +54,13 @@ class YoutubeVideoCard extends StatelessWidget {
                 Navigator.push(
                     context,
                     MaterialPageRoute(
-                        builder: (_) =>
-                            YtVideoPlayer(videoId: ytVideo.videoId)));
+                        builder: (_) => YtVideoPlayer(
+                              videoId: ytVideo.videoId,
+                              videoTitle: ytVideo.videoTitle,
+                              viewsCount: ytVideo.viewsCount,
+                              channelName: ytVideo.channelName,
+                              thumbnailUrl: ytVideo.thumbnailUrl,
+                            )));
               },
               icon: Icon(
                 Icons.play_circle,

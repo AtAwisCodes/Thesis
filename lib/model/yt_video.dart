@@ -5,10 +5,11 @@ class YtVideo {
   final String viewsCount;
   final String channelName;
 
-  YtVideo(
-      {required this.videoId,
-      required this.videoTitle,
-      required this.thumbnailUrl,
-      required this.viewsCount,
-      required this.channelName});
+  YtVideo({
+    required this.videoId,
+    required this.videoTitle,
+    required this.thumbnailUrl,
+    required this.viewsCount,
+    required this.channelName,
+  });
 }

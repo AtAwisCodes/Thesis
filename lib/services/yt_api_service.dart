@@ -10,7 +10,7 @@ class YtApiService {
     try {
       List<YtVideo> allVideos = [];
       var response = await http.get(Uri.parse(
-          "$baseUrl?part=snippet&playlistId=PLoaTLsTsV3hPJDj7YaE1p0k-Pp1GdWPcV&key=${ApiKeys.youtubeApiKey}"));
+          "$baseUrl?part=snippet&playlistId=PLoaTLsTsV3hM7dBxY2mI-tMFlI3YW6DPE&key=${ApiKeys.youtubeApiKey}"));
 
       if (response.statusCode == 200) {
         var jsonData = jsonDecode(response.body);
@@ -22,7 +22,7 @@ class YtApiService {
               videoId: videoData['snippet']['resourceId']['videoId'],
               videoTitle: videoData['snippet']['title'],
               thumbnailUrl: videoData['snippet']['thumbnails']['maxres']['url'],
-              viewsCount: "",
+              viewsCount: "100M",
               channelName: videoData['snippet']['channelTitle']);
 
           allVideos.add(video);
@@ -38,4 +38,6 @@ class YtApiService {
       print("Error fetching data $e");
     }
   }
+
+  static allVideos() {}
 }
