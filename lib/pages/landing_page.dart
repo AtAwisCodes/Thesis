@@ -1,8 +1,6 @@
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:flutter/material.dart';
 import 'package:rexplore/pages/auth_page.dart';
-import 'package:rexplore/pages/home_page.dart';
-import "package:rexplore/services/auth_service.dart";
 
 class LandingPage extends StatefulWidget {
   const LandingPage({super.key});

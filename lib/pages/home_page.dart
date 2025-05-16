@@ -69,6 +69,8 @@ class _HomePageState extends State<HomePage> {
             ),
         ],
       ),
+
+      //Drawer
       drawer: (page == 4)
           ? Drawer(
               child: ListView(
@@ -97,10 +99,20 @@ class _HomePageState extends State<HomePage> {
                     },
                     secondary: const Icon(Icons.brightness_6),
                   ),
-                  const ListTile(title: Text('About Us')),
-                  const ListTile(title: Text('Library')),
-                  const ListTile(title: Text('Settings')),
+                  const ListTile(
+                    leading: Icon(Icons.info_outline),
+                    title: Text('About Us'),
+                  ),
+                  const ListTile(
+                    leading: Icon(Icons.library_books),
+                    title: Text('Library'),
+                  ),
+                  const ListTile(
+                    leading: Icon(Icons.settings),
+                    title: Text('Settings'),
+                  ),
                   ListTile(
+                    leading: const Icon(Icons.logout),
                     title: const Text('Logout'),
                     onTap: signUserOut,
                   ),
@@ -108,6 +120,7 @@ class _HomePageState extends State<HomePage> {
               ),
             )
           : null,
+
       body: Container(
         color: theme.scaffoldBackgroundColor,
         width: double.infinity,
@@ -115,6 +128,7 @@ class _HomePageState extends State<HomePage> {
         alignment: Alignment.center,
         child: getSelectedWidget(page: page),
       ),
+
       //Bottom Navigation
       bottomNavigationBar: CurvedNavigationBar(
         backgroundColor: Colors.transparent,
