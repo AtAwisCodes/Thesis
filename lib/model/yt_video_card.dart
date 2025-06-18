@@ -9,64 +9,95 @@ class YoutubeVideoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+
     return SizedBox(
-      height: MediaQuery.sizeOf(context).height * 0.4,
-      width: double.maxFinite,
+      height: screenHeight * 0.4,
+      width: double.infinity,
       child: Stack(
         alignment: AlignmentDirectional.center,
         children: [
           Card(
             color: Colors.transparent,
-            margin: EdgeInsets.all(10),
+            margin: EdgeInsets.all(screenWidth * 0.025), // Responsive margin
             elevation: 5,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Image.network(ytVideo.thumbnailUrl),
+                // Thumbnail
+                Image.network(
+                  ytVideo.thumbnailUrl,
+                  width: double.infinity,
+                  height: screenHeight * 0.22,
+                  fit: BoxFit.cover,
+                ),
+
+                // Video Title
                 Padding(
-                  padding: const EdgeInsets.all(8.0),
+                  padding: EdgeInsets.all(screenWidth * 0.025),
                   child: Text(
                     ytVideo.videoTitle,
                     style: TextStyle(
-                        color: Colors.white, fontWeight: FontWeight.bold),
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: screenWidth * 0.045, // Responsive font
+                    ),
                   ),
                 ),
+
+                // Channel Name
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                  padding:
+                      EdgeInsets.symmetric(horizontal: screenWidth * 0.025),
                   child: Text(
                     ytVideo.channelName,
-                    style: TextStyle(color: Colors.white),
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: screenWidth * 0.035,
+                    ),
                   ),
                 ),
-                const SizedBox(height: 20),
+
+                // Views Count
+                SizedBox(height: screenHeight * 0.015),
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                  padding:
+                      EdgeInsets.symmetric(horizontal: screenWidth * 0.025),
                   child: Text(
                     ytVideo.viewsCount,
-                    style: TextStyle(color: Colors.white),
+                    style: TextStyle(
+                      color: Colors.white54,
+                      fontSize: screenWidth * 0.035,
+                    ),
                   ),
-                )
+                ),
               ],
             ),
           ),
+
+          // Play Icon Button (overlay)
           IconButton(
-              onPressed: () {
-                Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (_) => YtVideoPlayer(
-                              videoId: ytVideo.videoId,
-                              videoTitle: ytVideo.videoTitle,
-                              viewsCount: ytVideo.viewsCount,
-                              channelName: ytVideo.channelName,
-                              thumbnailUrl: ytVideo.thumbnailUrl,
-                            )));
-              },
-              icon: Icon(
-                Icons.play_circle,
-                color: Colors.red,
-                size: 60,
-              ))
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => YtVideoPlayer(
+                    videoId: ytVideo.videoId,
+                    videoTitle: ytVideo.videoTitle,
+                    viewsCount: ytVideo.viewsCount,
+                    channelName: ytVideo.channelName,
+                    thumbnailUrl: ytVideo.thumbnailUrl,
+                  ),
+                ),
+              );
+            },
+            icon: Icon(
+              Icons.play_circle,
+              color: Colors.redAccent,
+              size: screenWidth * 0.15, // Responsive icon size
+            ),
+          ),
         ],
       ),
     );

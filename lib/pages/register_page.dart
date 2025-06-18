@@ -1,8 +1,10 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:rexplore/components/my_textfield.dart';
 import 'package:rexplore/components/my_button.dart';
 import 'package:rexplore/components/square_tile.dart';
+import 'package:rexplore/firebase_service.dart';
 import 'package:rexplore/services/auth_service.dart';
 
 class RegisterPage extends StatefulWidget {
@@ -17,33 +19,46 @@ class _RegisterPageState extends State<RegisterPage> {
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
   final confirmPasswordController = TextEditingController();
+  final lastNameController = TextEditingController();
+  final firstNameController = TextEditingController();
+  final ageController = TextEditingController();
+
+  @override
+  void dispose() {
+    emailController.dispose();
+    passwordController.dispose();
+    confirmPasswordController.dispose();
+    lastNameController.dispose();
+    firstNameController.dispose();
+    ageController.dispose();
+    super.dispose();
+  }
 
   void createAccount() async {
-    //loading screen
     showDialog(
       context: context,
-      builder: (context) {
-        return const Center(
-          child: CircularProgressIndicator(),
-        );
-      },
+      builder: (context) => const Center(child: CircularProgressIndicator()),
     );
-    //try creating the user
+
     try {
-      if (passwordController.text == confirmPasswordController.text) {
-        await FirebaseAuth.instance.createUserWithEmailAndPassword(
-          email: emailController.text,
-          password: passwordController.text,
-        );
-        //pop loading screen
-        Navigator.pop(context);
-      } else {
-        showErrorMessage("Passwords don't match!");
-      }
-    } on FirebaseAuthException catch (e) {
-      Navigator.pop(context);
-      //show error message
-      showErrorMessage(e.code);
+      // Create user
+      UserCredential userCredential =
+          await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: emailController.text.trim(),
+        password: passwordController.text.trim(),
+      );
+
+      // Add user details to Firestore
+      await FirebaseService().addUser(
+        firstName: firstNameController.text.trim(),
+        lastName: lastNameController.text.trim(),
+        age: int.parse(ageController.text.trim()),
+        email: emailController.text.trim(),
+      );
+
+      print('User successfully registered and added to Firestore!');
+    } catch (e) {
+      print('Registration error: $e');
     }
   }
 
@@ -66,166 +81,178 @@ class _RegisterPageState extends State<RegisterPage> {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final screenHeight = MediaQuery.sizeOf(context).height;
+
     return Dialog(
-        backgroundColor: Colors.transparent,
-        child: Stack(
-          children: [
-            CardDialog(),
-            Positioned(
-                top: 0,
-                right: 15,
-                height: 28,
-                width: 28,
-                child: OutlinedButton(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                    },
-                    style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.all(8),
-                        shape: const CircleBorder(),
-                        backgroundColor: Colors.transparent,
-                        side: BorderSide(color: Colors.transparent)),
-                    child: Icon(
-                      Icons.cancel,
-                      size: 30,
-                    )))
-          ],
-        ));
+      backgroundColor: Colors.transparent,
+      child: Stack(
+        children: [
+          _cardDialog(screenWidth, screenHeight),
+          Positioned(
+            top: 0,
+            right: screenWidth * 0.04,
+            height: screenHeight * 0.04,
+            width: screenHeight * 0.04,
+            child: OutlinedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              style: OutlinedButton.styleFrom(
+                padding: EdgeInsets.all(screenHeight * 0.005),
+                shape: const CircleBorder(),
+                backgroundColor: Colors.transparent,
+                side: BorderSide.none,
+              ),
+              child: Icon(Icons.cancel, size: screenHeight * 0.035),
+            ),
+          )
+        ],
+      ),
+    );
   }
 
-  Container CardDialog() {
+  Widget _cardDialog(double screenWidth, double screenHeight) {
     return Container(
-        padding: const EdgeInsets.symmetric(
-          vertical: 8,
-          horizontal: 32,
-        ),
-        margin: const EdgeInsets.all(15),
-        height: 500,
-        decoration: BoxDecoration(
-          color: const Color(0xff2A303E),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Center(
-          child: SingleChildScrollView(
-            child:
-                Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-              //Caption text
+      padding: EdgeInsets.symmetric(
+        vertical: screenHeight * 0.02,
+        horizontal: screenWidth * 0.06,
+      ),
+      margin: EdgeInsets.all(screenWidth * 0.04),
+      decoration: BoxDecoration(
+        color: const Color(0xff2A303E),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Center(
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
               Text(
                 'Sign Up',
                 style: TextStyle(
-                  fontSize: 40,
+                  fontSize: screenWidth * 0.08,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
                 ),
               ),
-
-              SizedBox(
-                height: 25,
+              SizedBox(height: screenHeight * 0.03),
+              MyTextfield(
+                controller: lastNameController,
+                hintText: 'Last Name',
+                obscureText: false,
               ),
-
-              //Username textbox
+              SizedBox(height: screenHeight * 0.015),
+              MyTextfield(
+                controller: firstNameController,
+                hintText: 'First Name',
+                obscureText: false,
+              ),
+              SizedBox(height: screenHeight * 0.015),
+              GestureDetector(
+                onTap: () async {
+                  DateTime? pickedDate = await showDatePicker(
+                    context: context,
+                    initialDate: DateTime(2000),
+                    firstDate: DateTime(1900),
+                    lastDate: DateTime.now(),
+                    builder: (context, child) => Theme(
+                      data: ThemeData.dark(),
+                      child: child!,
+                    ),
+                  );
+                  if (pickedDate != null) {
+                    ageController.text =
+                        "${pickedDate.month}/${pickedDate.day}/${pickedDate.year}";
+                  }
+                },
+                child: AbsorbPointer(
+                  child: MyTextfield(
+                    controller: ageController,
+                    hintText: 'Date of Birth (MM/DD/YYYY)',
+                    obscureText: false,
+                  ),
+                ),
+              ),
+              SizedBox(height: screenHeight * 0.015),
               MyTextfield(
                 controller: emailController,
                 hintText: 'Email',
                 obscureText: false,
               ),
-
-              SizedBox(
-                height: 8,
-              ),
-
-              //Password textbox
+              SizedBox(height: screenHeight * 0.015),
               MyTextfield(
                 controller: passwordController,
                 hintText: 'Password',
                 obscureText: true,
               ),
-
-              SizedBox(
-                height: 8,
-              ),
-
-              //Confirm Pass textbox
+              SizedBox(height: screenHeight * 0.015),
               MyTextfield(
                 controller: confirmPasswordController,
                 hintText: 'Confirm Password',
                 obscureText: true,
               ),
-
-              const SizedBox(
-                height: 10,
-              ),
-
-              //Create Account button
+              SizedBox(height: screenHeight * 0.02),
               MyButton(
                 text: "Create Account",
                 onTap: createAccount,
               ),
-              const SizedBox(
-                height: 30,
+              SizedBox(height: screenHeight * 0.03),
+              Row(
+                children: [
+                  const Expanded(
+                    child: Divider(thickness: 1, color: Colors.white),
+                  ),
+                  Padding(
+                    padding:
+                        EdgeInsets.symmetric(horizontal: screenWidth * 0.015),
+                    child: const Text('Or continue with',
+                        style: TextStyle(color: Colors.white)),
+                  ),
+                  const Expanded(
+                    child: Divider(thickness: 1, color: Colors.white),
+                  ),
+                ],
               ),
-
-              // or continue with
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 25.0),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Divider(
-                        thickness: 1,
-                        color: Colors.white,
-                      ),
-                    ),
-                    Text(
-                      'Or continue with',
-                      style: TextStyle(color: Colors.white),
-                    ),
-                    Expanded(
-                      child: Divider(
-                        thickness: 1,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(
-                height: 30,
-              ),
-
-              // google logo
+              SizedBox(height: screenHeight * 0.03),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   SquareTile(
-                      onTap: () => AuthService().signInWithGoogle(),
-                      imagePath: 'lib/icons/Google.png')
+                    onTap: () => AuthService().signInWithGoogle(),
+                    imagePath: 'lib/icons/Google.png',
+                  ),
                 ],
               ),
-
-              const SizedBox(
-                height: 30,
-              ),
-
-              //Already have an account
-              Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                Text('Already have an account?',
-                    style: TextStyle(color: Colors.grey[700], fontSize: 11)),
-                const SizedBox(width: 6),
-                GestureDetector(
-                  onTap: widget.onTap,
-                  child: const Text(
-                    'Login now',
+              SizedBox(height: screenHeight * 0.03),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'Already have an account?',
                     style: TextStyle(
+                      color: Colors.grey[700],
+                      fontSize: screenWidth * 0.032,
+                    ),
+                  ),
+                  SizedBox(width: screenWidth * 0.02),
+                  GestureDetector(
+                    onTap: widget.onTap,
+                    child: Text(
+                      'Login now',
+                      style: TextStyle(
                         color: Colors.blue,
                         fontWeight: FontWeight.bold,
-                        fontSize: 12),
+                        fontSize: screenWidth * 0.034,
+                      ),
+                    ),
                   ),
-                ),
-              ])
-            ]),
+                ],
+              ),
+            ],
           ),
-        ));
+        ),
+      ),
+    );
   }
 }

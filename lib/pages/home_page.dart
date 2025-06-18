@@ -23,10 +23,6 @@ void signUserOut() {
 }
 
 class _HomePageState extends State<HomePage> {
-  static const Color forestGreen = Color(0xFF228B22); //Kahit saan
-  static const Color earthyBeige = Color(0xFFF5F5DC); // Background beige
-  static const Color lightGreen = Color(0xFF8BC34A); // Secondary green
-
   //defaultPage
   int page = 0;
 

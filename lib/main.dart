@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 import 'package:provider/provider.dart';
 import 'package:rexplore/firebase_service.dart';
-import 'package:rexplore/pages/home_page.dart';
 import 'package:rexplore/pages/landing_page.dart';
 import 'package:rexplore/services/ThemeProvider.dart';
 import 'package:rexplore/theme.dart/darkTheme.dart';
@@ -39,7 +38,7 @@ class MyApp extends StatelessWidget {
       theme: lightTheme,
       darkTheme: darkTheme,
       themeMode: themeProvider.isDarkMode ? ThemeMode.dark : ThemeMode.light,
-      home: const HomePage(),
+      home: const LandingPage(),
     );
   }
 }

@@ -14,145 +14,131 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
-// text editting controllers
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
 
-//Create Account button
   void signInUser() async {
-    //loading screen
     showDialog(
       context: context,
-      builder: (context) {
-        return const Center(
-          child: CircularProgressIndicator(),
-        );
-      },
+      builder: (context) => const Center(child: CircularProgressIndicator()),
     );
 
-    //Email&Password Validation
     try {
       await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: emailController.text,
-        password: passwordController.text,
+        email: emailController.text.trim(),
+        password: passwordController.text.trim(),
       );
       Navigator.pop(context);
     } on FirebaseAuthException {
       Navigator.pop(context);
-      //show error message
       showErrorMessage("Some information not matched in our system");
     }
   }
 
-//Notification para sa maling email at password
   void showErrorMessage(String message) {
     showDialog(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          backgroundColor: Colors.deepPurple,
-          title: Center(
-            child: Text(
-              message.toString(),
-              style: const TextStyle(color: Colors.white),
-            ),
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.deepPurple,
+        title: Center(
+          child: Text(
+            message,
+            style: const TextStyle(color: Colors.white),
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final screenHeight = MediaQuery.sizeOf(context).height;
+
     return Dialog(
-        backgroundColor: Colors.transparent,
-        child: Stack(
-          children: [
-            CardDialog(),
-            Positioned(
-                top: 0,
-                right: 15,
-                height: 28,
-                width: 28,
-                child: OutlinedButton(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                    },
-                    style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.all(8),
-                        shape: const CircleBorder(),
-                        backgroundColor: Colors.transparent,
-                        side: BorderSide(color: Colors.transparent)),
-                    child: Icon(
-                      Icons.cancel,
-                      size: 30,
-                    )))
-          ],
-        ));
+      backgroundColor: Colors.transparent,
+      child: Stack(
+        children: [
+          CardDialog(screenWidth: screenWidth, screenHeight: screenHeight),
+          Positioned(
+            top: 0,
+            right: screenWidth * 0.04,
+            height: 28,
+            width: 28,
+            child: OutlinedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              style: OutlinedButton.styleFrom(
+                padding: EdgeInsets.all(screenWidth * 0.01),
+                shape: const CircleBorder(),
+                backgroundColor: Colors.transparent,
+                side: BorderSide(color: Colors.transparent),
+              ),
+              child: Icon(
+                Icons.cancel,
+                size: screenWidth * 0.07,
+              ),
+            ),
+          )
+        ],
+      ),
+    );
   }
 
-  Container CardDialog() {
+  Widget CardDialog(
+      {required double screenWidth, required double screenHeight}) {
     return Container(
-        padding: const EdgeInsets.symmetric(
-          vertical: 8,
-          horizontal: 32,
-        ),
-        margin: const EdgeInsets.all(15),
-        height: 500,
-        decoration: BoxDecoration(
-          color: const Color(0xff2A303E),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Center(
-          child: SingleChildScrollView(
-            child:
-                Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-              //Welcome
+      padding: EdgeInsets.symmetric(
+        vertical: screenHeight * 0.02,
+        horizontal: screenWidth * 0.06,
+      ),
+      margin: EdgeInsets.all(screenWidth * 0.04),
+      decoration: BoxDecoration(
+        color: const Color(0xff2A303E),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Center(
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
               Text(
                 'Welcome!',
                 style: TextStyle(
                   color: Colors.white,
-                  fontSize: 40,
+                  fontSize: screenWidth * 0.08,
                   fontWeight: FontWeight.bold,
                 ),
               ),
-
-              //Create your account
               Text(
                 'Login to your account!',
                 style: TextStyle(
                   color: Colors.white,
+                  fontSize: screenWidth * 0.04,
                 ),
               ),
+              SizedBox(height: screenHeight * 0.03),
 
-              const SizedBox(
-                height: 25,
-              ),
-
-              // Username
+              // Email
               MyTextfield(
                 controller: emailController,
                 hintText: 'Email',
                 obscureText: false,
               ),
+              SizedBox(height: screenHeight * 0.015),
 
-              const SizedBox(
-                height: 8,
-              ),
-
-              // password
+              // Password
               MyTextfield(
                 controller: passwordController,
                 hintText: 'Password',
                 obscureText: true,
               ),
+              SizedBox(height: screenHeight * 0.015),
 
-              const SizedBox(
-                height: 8,
-              ),
-
+              // Forgot Password
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 25.0),
+                padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.01),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
@@ -163,82 +149,68 @@ class _LoginPageState extends State<LoginPage> {
                   ],
                 ),
               ),
+              SizedBox(height: screenHeight * 0.02),
 
-              const SizedBox(
-                height: 10,
+              // Sign In Button
+              MyButton(text: "Sign In", onTap: signInUser),
+              SizedBox(height: screenHeight * 0.03),
+
+              // Divider
+              Row(
+                children: [
+                  Expanded(child: Divider(color: Colors.white)),
+                  Padding(
+                    padding:
+                        EdgeInsets.symmetric(horizontal: screenWidth * 0.015),
+                    child: Text('Or continue with',
+                        style: TextStyle(color: Colors.white)),
+                  ),
+                  Expanded(child: Divider(color: Colors.white)),
+                ],
               ),
+              SizedBox(height: screenHeight * 0.03),
 
-              // Sign in button
-              MyButton(
-                text: "Sign In",
-                onTap: signInUser,
-              ),
-
-              const SizedBox(
-                height: 30,
-              ),
-
-              // or sign in with
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 25.0),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Divider(
-                        thickness: 1,
-                        color: Colors.white,
-                      ),
-                    ),
-                    Text(
-                      'Or continue with',
-                      style: TextStyle(color: Colors.white),
-                    ),
-                    Expanded(
-                      child: Divider(
-                        thickness: 1,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(
-                height: 30,
-              ),
-
-              // google logo
+              // Google Button
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   SquareTile(
-                      onTap: () => AuthService().signInWithGoogle(),
-                      imagePath: 'lib/icons/Google.png')
+                    onTap: () => AuthService().signInWithGoogle(),
+                    imagePath: 'lib/icons/Google.png',
+                  )
                 ],
               ),
+              SizedBox(height: screenHeight * 0.03),
 
-              const SizedBox(
-                height: 30,
-              ),
-
-              //already have an account
-              Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                Text('Don\'t have an account yet?',
-                    style: TextStyle(color: Colors.grey[700], fontSize: 11)),
-                const SizedBox(width: 6),
-                GestureDetector(
-                  onTap: widget.onTap,
-                  child: const Text(
-                    'Register now',
+              // Don't have an account
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'Don\'t have an account yet?',
                     style: TextStyle(
+                      color: Colors.grey[700],
+                      fontSize: screenWidth * 0.03,
+                    ),
+                  ),
+                  SizedBox(width: screenWidth * 0.015),
+                  GestureDetector(
+                    onTap: widget.onTap,
+                    child: Text(
+                      'Register now',
+                      style: TextStyle(
                         color: Colors.blue,
                         fontWeight: FontWeight.bold,
-                        fontSize: 12),
+                        fontSize: screenWidth * 0.032,
+                      ),
+                    ),
                   ),
-                ),
-              ])
-            ]),
+                ],
+              )
+            ],
           ),
-        ));
+        ),
+      ),
+    );
   }
 }

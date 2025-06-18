@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:rexplore/model/yt_video_card.dart';
@@ -14,30 +13,40 @@ class VideosPage extends StatefulWidget {
 class _VideosPage extends State<VideosPage> {
   @override
   void initState() {
-    Provider.of<YtVideoviewModel>(context, listen: false).getAllVideos();
     super.initState();
+    Future.microtask(() {
+      Provider.of<YtVideoviewModel>(context, listen: false).getAllVideos();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      //Videos
-      backgroundColor: Colors.transparent,
-      body: Consumer<YtVideoviewModel>(builder: (context, YtVideoviewModel, _) {
-        if (YtVideoviewModel.playlistItems.isEmpty) {
-          return Center(
-            child: Text("No Videos"),
+      body: Consumer<YtVideoviewModel>(
+        builder: (context, ytVideoViewModel, _) {
+          return NotificationListener<ScrollNotification>(
+            onNotification: (ScrollNotification scrollInfo) {
+              if (scrollInfo.metrics.pixels ==
+                      scrollInfo.metrics.maxScrollExtent &&
+                  ytVideoViewModel.nextPageToken != null &&
+                  !ytVideoViewModel.isLoading) {
+                ytVideoViewModel.getAllVideos(loadMore: true);
+              }
+              return false;
+            },
+            child: ytVideoViewModel.playlistItems.isEmpty
+                ? const Center(child: CircularProgressIndicator())
+                : ListView.builder(
+                    itemCount: ytVideoViewModel.playlistItems.length,
+                    itemBuilder: (context, index) {
+                      return YoutubeVideoCard(
+                        ytVideo: ytVideoViewModel.playlistItems[index],
+                      );
+                    },
+                  ),
           );
-        } else {
-          return ListView.builder(
-              itemCount: YtVideoviewModel.playlistItems.length,
-              itemBuilder: (context, index) {
-                return YoutubeVideoCard(
-                  ytVideo: YtVideoviewModel.playlistItems[index],
-                );
-              });
-        }
-      }),
+        },
+      ),
     );
   }
 }

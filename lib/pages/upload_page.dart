@@ -10,9 +10,8 @@ class UploadPage extends StatefulWidget {
 class _UploadPage extends State<UploadPage> {
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Center(
         child: ElevatedButton(
           onPressed: () {
@@ -21,7 +20,7 @@ class _UploadPage extends State<UploadPage> {
               builder: (context) => const CustomDialogWidget(),
             );
           },
-          child: Text("Upload Video"),
+          child: const Text("Upload Video"),
         ),
       ),
     );
@@ -33,13 +32,24 @@ class CustomDialogWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+    final isPortrait =
+        MediaQuery.of(context).orientation == Orientation.portrait;
+
     return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: EdgeInsets.symmetric(horizontal: screenWidth * 0.05),
       child: Container(
-        padding: const EdgeInsets.symmetric(
-          vertical: 8,
-          horizontal: 32,
+        width: double.infinity,
+        constraints: BoxConstraints(
+          maxHeight: screenHeight * 0.9,
+          minWidth: screenWidth * 0.8,
         ),
-        height: 500,
+        padding: EdgeInsets.symmetric(
+          vertical: screenHeight * 0.02,
+          horizontal: screenWidth * 0.06,
+        ),
         decoration: BoxDecoration(
           color: const Color(0xff2A303E),
           borderRadius: BorderRadius.circular(12),
@@ -48,14 +58,11 @@ class CustomDialogWidget extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const SizedBox(
-                height: 10,
-                width: 30,
-              ),
+              SizedBox(height: screenHeight * 0.01),
               Row(
                 mainAxisAlignment: MainAxisAlignment.start,
-                children: [
-                  const Text(
+                children: const [
+                  Text(
                     "Video",
                     style: TextStyle(
                       fontSize: 19,
@@ -65,32 +72,25 @@ class CustomDialogWidget extends StatelessWidget {
                   ),
                 ],
               ),
-
-              const SizedBox(height: 8),
-
-              // File Picker
+              SizedBox(height: screenHeight * 0.015),
               Container(
                 alignment: Alignment.center,
-                width: 300,
-                height: 300,
+                width: double.infinity,
+                height: screenHeight * 0.25,
                 decoration: BoxDecoration(
                   border: Border.all(color: Colors.white38),
-                  borderRadius: BorderRadius.all(Radius.circular(5.0)),
-                  color: Colors.transparent,
+                  borderRadius: BorderRadius.circular(5),
                 ),
                 child: OutlinedButton(
                   onPressed: () {},
                   child: const Text("Select Video from File"),
                 ),
               ),
-
-              const SizedBox(height: 20),
-
-              // Title
+              SizedBox(height: screenHeight * 0.03),
               Row(
                 mainAxisAlignment: MainAxisAlignment.start,
-                children: [
-                  const Text(
+                children: const [
+                  Text(
                     "Details",
                     style: TextStyle(
                       fontSize: 19,
@@ -100,64 +100,56 @@ class CustomDialogWidget extends StatelessWidget {
                   ),
                 ],
               ),
-
-              const SizedBox(height: 10),
-
-              // Title Textbox
+              SizedBox(height: screenHeight * 0.015),
               TextField(
                 decoration: InputDecoration(
                   hintText: "Title (required)",
-                  hintStyle: TextStyle(color: Colors.white38),
-                  border: OutlineInputBorder(),
+                  hintStyle: const TextStyle(color: Colors.white38),
+                  border: const OutlineInputBorder(),
                 ),
               ),
-
-              const SizedBox(height: 10),
-
-              // Description
+              SizedBox(height: screenHeight * 0.015),
               TextField(
+                maxLines: 3,
                 decoration: InputDecoration(
                   hintText: "Description",
-                  hintStyle: TextStyle(color: Colors.white38),
-                  border: OutlineInputBorder(),
+                  hintStyle: const TextStyle(color: Colors.white38),
+                  border: const OutlineInputBorder(),
                 ),
               ),
-
-              const SizedBox(height: 20),
-
-              // Buttons
+              SizedBox(height: screenHeight * 0.03),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  // Cancel Button
-                  OutlinedButton(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 8,
-                        horizontal: 32,
+                  Flexible(
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        padding: EdgeInsets.symmetric(
+                          vertical: screenHeight * 0.015,
+                          horizontal: screenWidth * 0.06,
+                        ),
                       ),
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text("Cancel"),
                     ),
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                    },
-                    child: const Text("Cancel"),
                   ),
-
-                  // Submit Button
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xff5BEC84),
-                      foregroundColor: const Color(0xff2A303E),
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 8,
-                        horizontal: 32,
+                  SizedBox(width: screenWidth * 0.04),
+                  Flexible(
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xff5BEC84),
+                        foregroundColor: const Color(0xff2A303E),
+                        padding: EdgeInsets.symmetric(
+                          vertical: screenHeight * 0.015,
+                          horizontal: screenWidth * 0.06,
+                        ),
                       ),
-                    ),
-                    onPressed: () {},
-                    child: const Text(
-                      "Upload",
-                      style: TextStyle(fontWeight: FontWeight.bold),
+                      onPressed: () {},
+                      child: const Text(
+                        "Upload",
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
                     ),
                   ),
                 ],
