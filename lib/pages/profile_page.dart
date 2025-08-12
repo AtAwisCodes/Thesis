@@ -1,6 +1,8 @@
+import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -18,6 +20,9 @@ class _ProfilePageState extends State<ProfilePage> {
   String avatarPath = 'lib/icons/ReXplore.png';
 
   bool isLoading = true;
+
+  File? _pickedImage;
+  final ImagePicker _picker = ImagePicker();
 
   final TextEditingController nameController = TextEditingController();
   final TextEditingController bioController = TextEditingController();
@@ -37,8 +42,8 @@ class _ProfilePageState extends State<ProfilePage> {
       if (doc.exists) {
         final data = doc.data()!;
         setState(() {
-          firstName = data['first name'] ?? '';
-          lastName = data['last name'] ?? '';
+          firstName = data['first_name'] ?? '';
+          lastName = data['last_name'] ?? '';
           email = data['email'] ?? '';
           bio = data['bio'] ?? 'No bio available.';
           isLoading = false;
@@ -57,8 +62,17 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
+  Future<void> _pickImage() async {
+    final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
+    if (pickedFile != null) {
+      setState(() {
+        _pickedImage = File(pickedFile.path);
+      });
+    }
+  }
+
   void _showEditDialog() {
-    nameController.text = "$firstName $middleInitial. $lastName";
+    nameController.text = "$firstName $lastName";
     bioController.text = bio;
 
     showDialog(
@@ -68,9 +82,35 @@ class _ProfilePageState extends State<ProfilePage> {
         content: SingleChildScrollView(
           child: Column(
             children: [
-              CircleAvatar(
-                radius: 40,
-                backgroundImage: AssetImage(avatarPath),
+              Stack(
+                alignment: Alignment.bottomRight,
+                children: [
+                  CircleAvatar(
+                    radius: 40,
+                    backgroundImage: _pickedImage != null
+                        ? FileImage(_pickedImage!)
+                        : AssetImage(avatarPath) as ImageProvider,
+                  ),
+                  Positioned(
+                    bottom: 0,
+                    right: 0,
+                    child: GestureDetector(
+                      onTap: _pickImage,
+                      child: Container(
+                        decoration: const BoxDecoration(
+                          color: Colors.black54,
+                          shape: BoxShape.circle,
+                        ),
+                        padding: const EdgeInsets.all(6),
+                        child: const Icon(
+                          Icons.camera_alt,
+                          size: 18,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 10),
               TextField(
@@ -92,16 +132,28 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
           ElevatedButton(
             onPressed: () async {
+              final fullName = nameController.text.trim();
+              final nameParts = fullName.split(' ');
+              String updatedFirstName =
+                  nameParts.isNotEmpty ? nameParts[0] : '';
+              String updatedLastName =
+                  nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
+
               setState(() {
-                bio = bioController.text;
+                firstName = updatedFirstName;
+                lastName = updatedLastName;
+                bio = bioController.text.trim();
               });
 
-              //Save the updated bio to Firestore
               final uid = FirebaseAuth.instance.currentUser!.uid;
               await FirebaseFirestore.instance
                   .collection('count')
                   .doc(uid)
-                  .update({'bio': bio});
+                  .update({
+                'first_name': updatedFirstName,
+                'last_name': updatedLastName,
+                'bio': bio,
+              });
 
               Navigator.pop(context);
             },
@@ -133,7 +185,9 @@ class _ProfilePageState extends State<ProfilePage> {
                           children: [
                             CircleAvatar(
                               radius: 50,
-                              backgroundImage: AssetImage(avatarPath),
+                              backgroundImage: _pickedImage != null
+                                  ? FileImage(_pickedImage!)
+                                  : AssetImage(avatarPath) as ImageProvider,
                             ),
                             const SizedBox(height: 8),
                             SizedBox(
@@ -158,7 +212,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                 children: [
                                   Expanded(
                                     child: Text(
-                                      "$firstName $middleInitial. $lastName",
+                                      "$firstName $lastName",
                                       style: const TextStyle(
                                         fontSize: 25,
                                         fontWeight: FontWeight.bold,

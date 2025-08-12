@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:rexplore/components/my_textfield.dart';
@@ -35,31 +34,69 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   void createAccount() async {
+    final password = passwordController.text.trim();
+    final confirmPassword = confirmPasswordController.text.trim();
+
+    if (password != confirmPassword) {
+      showErrorMessage("Passwords do not match.");
+      return;
+    }
+
+    DateTime? dob;
+    try {
+      // Expecting MM/DD/YYYY
+      List<String> parts = ageController.text.trim().split('/');
+      if (parts.length == 3) {
+        int month = int.parse(parts[0]);
+        int day = int.parse(parts[1]);
+        int year = int.parse(parts[2]);
+        dob = DateTime(year, month, day);
+      } else {
+        showErrorMessage("Invalid date of birth format.");
+        return;
+      }
+    } catch (e) {
+      showErrorMessage("Invalid date of birth.");
+      return;
+    }
+
+    int userAge = calculateAge(dob);
+
     showDialog(
       context: context,
       builder: (context) => const Center(child: CircularProgressIndicator()),
     );
 
     try {
-      // Create user
-      UserCredential userCredential =
-          await FirebaseAuth.instance.createUserWithEmailAndPassword(
+      await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: emailController.text.trim(),
-        password: passwordController.text.trim(),
+        password: password,
       );
 
-      // Add user details to Firestore
       await FirebaseService().addUser(
         firstName: firstNameController.text.trim(),
         lastName: lastNameController.text.trim(),
-        age: int.parse(ageController.text.trim()),
+        age: userAge,
         email: emailController.text.trim(),
       );
 
       print('User successfully registered and added to Firestore!');
+      Navigator.of(context).pop();
     } catch (e) {
+      Navigator.of(context).pop();
+      showErrorMessage("Registration failed: ${e.toString()}");
       print('Registration error: $e');
     }
+  }
+
+  int calculateAge(DateTime dob) {
+    final today = DateTime.now();
+    int age = today.year - dob.year;
+    if (today.month < dob.month ||
+        (today.month == dob.month && today.day < dob.day)) {
+      age--;
+    }
+    return age;
   }
 
   void showErrorMessage(String message) {

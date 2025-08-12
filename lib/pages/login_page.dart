@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:rexplore/components/my_button.dart';
 import 'package:rexplore/components/my_textfield.dart';
 import 'package:rexplore/components/square_tile.dart';
+import 'package:rexplore/pages/home_page.dart';
 import 'package:rexplore/services/auth_service.dart';
 
 class LoginPage extends StatefulWidget {
@@ -175,7 +176,37 @@ class _LoginPageState extends State<LoginPage> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   SquareTile(
-                    onTap: () => AuthService().signInWithGoogle(),
+                    onTap: () async {
+                      try {
+                        final userCredential =
+                            await AuthService().signInWithGoogle();
+                        if (userCredential != null) {
+                          Navigator.of(context).pop(); // close login dialog
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(
+                                builder: (context) => const HomePage()),
+                          );
+                        }
+                      } catch (e) {
+                        showDialog(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            backgroundColor: Colors.deepPurple,
+                            title: const Center(
+                              child: Text(
+                                'Google sign-in failed',
+                                style: TextStyle(color: Colors.white),
+                              ),
+                            ),
+                            content: Text(
+                              e.toString(),
+                              style: const TextStyle(color: Colors.white),
+                            ),
+                          ),
+                        );
+                      }
+                    },
                     imagePath: 'lib/icons/Google.png',
                   )
                 ],
