@@ -12,4 +12,6 @@ class YtVideo {
     required this.viewsCount,
     required this.channelName,
   });
+
+  get channelAvatarUrl => null;
 }

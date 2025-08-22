@@ -2,8 +2,8 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:rexplore/utilities/uploadSelection.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:video_player/video_player.dart';
-import 'package:rexplore/firebase_service.dart';
 
 class UploadPage extends StatefulWidget {
   const UploadPage({super.key});
@@ -20,8 +20,10 @@ class _UploadPage extends State<UploadPage> {
       body: Center(
         child: ElevatedButton(
           onPressed: () {
-            showDialog(
+            showModalBottomSheet(
               context: context,
+              isScrollControlled: true,
+              backgroundColor: Colors.transparent,
               builder: (context) => const CustomDialogWidget(),
             );
           },
@@ -40,9 +42,9 @@ class CustomDialogWidget extends StatefulWidget {
 }
 
 class _CustomDialogWidgetState extends State<CustomDialogWidget> {
+  final _future = Supabase.instance.client.from('').select();
   String? _videoPath;
   VideoPlayerController? _videoController;
-  String? _downloadUrl;
   Timer? _hideControlsTimer;
   bool _showControls = true;
 
@@ -55,220 +57,239 @@ class _CustomDialogWidgetState extends State<CustomDialogWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
-    final isPortrait =
-        MediaQuery.of(context).orientation == Orientation.portrait;
 
-    return Dialog(
-      backgroundColor: Colors.transparent,
-      insetPadding: EdgeInsets.symmetric(horizontal: screenWidth * 0.05),
-      child: Container(
-        width: double.infinity,
-        constraints: BoxConstraints(
-          maxHeight: screenHeight * 0.9,
-          minWidth: screenWidth * 0.8,
-        ),
-        padding: EdgeInsets.symmetric(
-          vertical: screenHeight * 0.02,
-          horizontal: screenWidth * 0.06,
-        ),
-        decoration: BoxDecoration(
-          color: const Color(0xff2A303E),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SizedBox(height: screenHeight * 0.01),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.start,
-                children: const [
-                  Text(
-                    "Video",
-                    style: TextStyle(
-                      fontSize: 19,
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(height: screenHeight * 0.015),
-
-              // Video selection area
-              Container(
-                alignment: Alignment.center,
-                width: double.infinity,
-                height: screenHeight * 0.25,
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.white38),
-                  borderRadius: BorderRadius.circular(5),
-                ),
-                child: _videoController != null &&
-                        _videoController!.value.isInitialized
-                    ? LayoutBuilder(
-                        builder: (context, constraints) {
-                          return GestureDetector(
-                            onTap: () {
-                              setState(() {
-                                if (_videoController!.value.isPlaying) {
-                                  _videoController!.pause();
-                                } else {
-                                  _videoController!.play();
-                                }
-                              });
-                              _resetControlsTimer();
-                            },
-                            child: Stack(
-                              children: [
-                                // Video
-                                Positioned.fill(
-                                  child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(5),
-                                    child: AspectRatio(
-                                      aspectRatio:
-                                          _videoController!.value.aspectRatio,
-                                      child: VideoPlayer(_videoController!),
-                                    ),
-                                  ),
-                                ),
-                                // Play/Pause Icon with Fade
-                                Center(
-                                  child: AnimatedOpacity(
-                                    duration: const Duration(milliseconds: 300),
-                                    opacity: _showControls ? 1.0 : 0.0,
-                                    child: Icon(
-                                      _videoController!.value.isPlaying
-                                          ? Icons.pause_circle_filled
-                                          : Icons.play_circle_fill,
-                                      color: Colors.white70,
-                                      size: constraints.maxHeight * 0.4,
-                                    ),
-                                  ),
-                                ),
-                                // Change video button
-                                Positioned(
-                                  top: 8,
-                                  right: 8,
-                                  child: InkWell(
-                                    onTap: () {
-                                      _pickVideo();
-                                    },
-                                    borderRadius: BorderRadius.circular(30),
-                                    child: Container(
-                                      padding: const EdgeInsets.all(6),
-                                      decoration: const BoxDecoration(
-                                        color: Colors.black54,
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: Icon(
-                                        Icons.change_circle,
-                                        color: Colors.white,
-                                        size: constraints.maxHeight * 0.15,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      )
-                    : OutlinedButton(
-                        onPressed: _pickVideo,
-                        child: const Text("Select Video from File"),
-                      ),
-              ),
-
-              SizedBox(height: screenHeight * 0.03),
-
-              Row(
-                mainAxisAlignment: MainAxisAlignment.start,
-                children: const [
-                  Text(
-                    "Details",
-                    style: TextStyle(
-                      fontSize: 19,
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-
-              SizedBox(height: screenHeight * 0.015),
-
-              // Title
-              TextField(
-                decoration: InputDecoration(
-                  hintText: "Title (required)",
-                  hintStyle: const TextStyle(color: Colors.white38),
-                  border: const OutlineInputBorder(),
-                ),
-              ),
-
-              SizedBox(height: screenHeight * 0.015),
-
-              // Description
-              TextField(
-                maxLines: 3,
-                decoration: InputDecoration(
-                  hintText: "Description",
-                  hintStyle: const TextStyle(color: Colors.white38),
-                  border: const OutlineInputBorder(),
-                ),
-              ),
-              SizedBox(height: screenHeight * 0.03),
-
-              // Tags
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Flexible(
-                    child: OutlinedButton(
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.white,
-                        padding: EdgeInsets.symmetric(
-                          vertical: screenHeight * 0.015,
-                          horizontal: screenWidth * 0.06,
-                        ),
-                      ),
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: const Text("Cancel"),
-                    ),
-                  ),
-                  SizedBox(width: screenWidth * 0.04),
-                  Flexible(
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xff5BEC84),
-                        foregroundColor: const Color(0xff2A303E),
-                        padding: EdgeInsets.symmetric(
-                          vertical: screenHeight * 0.015,
-                          horizontal: screenWidth * 0.06,
-                        ),
-                      ),
-                      onPressed: () {
-                        _uploadVideo();
-                      },
-                      child: const Text(
-                        "Upload",
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+    return DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.9,
+      maxChildSize: 0.95,
+      minChildSize: 0.6,
+      builder: (context, scrollController) {
+        return Container(
+          width: double.infinity,
+          padding: EdgeInsets.symmetric(
+            vertical: screenHeight * 0.02,
+            horizontal: screenWidth * 0.06,
+          ),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            boxShadow: [
+              BoxShadow(
+                color: theme.shadowColor.withOpacity(0.2),
+                blurRadius: 10,
+                offset: const Offset(0, -3),
+              )
             ],
           ),
-        ),
-      ),
+          child: SingleChildScrollView(
+            controller: scrollController,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Grab handle
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 5,
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.onSurface.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+
+                // Title
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  children: [
+                    Text(
+                      "Video",
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: screenHeight * 0.015),
+
+                // Video selection area
+                Container(
+                  alignment: Alignment.center,
+                  width: double.infinity,
+                  height: screenHeight * 0.25,
+                  decoration: BoxDecoration(
+                    border: Border.all(color: theme.dividerColor),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: _videoController != null &&
+                          _videoController!.value.isInitialized
+                      ? LayoutBuilder(
+                          builder: (context, constraints) {
+                            return GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  if (_videoController!.value.isPlaying) {
+                                    _videoController!.pause();
+                                  } else {
+                                    _videoController!.play();
+                                  }
+                                });
+                                _resetControlsTimer();
+                              },
+                              child: Stack(
+                                children: [
+                                  // Video
+                                  Positioned.fill(
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: AspectRatio(
+                                        aspectRatio:
+                                            _videoController!.value.aspectRatio,
+                                        child: VideoPlayer(_videoController!),
+                                      ),
+                                    ),
+                                  ),
+                                  // Play/Pause Icon with Fade
+                                  Center(
+                                    child: AnimatedOpacity(
+                                      duration:
+                                          const Duration(milliseconds: 300),
+                                      opacity: _showControls ? 1.0 : 0.0,
+                                      child: Icon(
+                                        _videoController!.value.isPlaying
+                                            ? Icons.pause_circle_filled
+                                            : Icons.play_circle_fill,
+                                        color: theme.colorScheme.onSurface
+                                            .withOpacity(0.8),
+                                        size: constraints.maxHeight * 0.4,
+                                      ),
+                                    ),
+                                  ),
+                                  // Change video button
+                                  Positioned(
+                                    top: 8,
+                                    right: 8,
+                                    child: InkWell(
+                                      onTap: () {
+                                        _pickVideo();
+                                      },
+                                      borderRadius: BorderRadius.circular(30),
+                                      child: Container(
+                                        padding: const EdgeInsets.all(6),
+                                        decoration: BoxDecoration(
+                                          color: theme.colorScheme.surface
+                                              .withOpacity(0.6),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: Icon(
+                                          Icons.change_circle,
+                                          color: theme.colorScheme.primary,
+                                          size: constraints.maxHeight * 0.15,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        )
+                      : OutlinedButton(
+                          onPressed: _pickVideo,
+                          child: const Text("Select Video from File"),
+                        ),
+                ),
+
+                SizedBox(height: screenHeight * 0.03),
+
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  children: [
+                    Text(
+                      "Details",
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+
+                SizedBox(height: screenHeight * 0.015),
+
+                // Title Input
+                TextField(
+                  decoration: InputDecoration(
+                    hintText: "Title (required)",
+                    hintStyle: TextStyle(
+                      color: theme.hintColor,
+                    ),
+                    border: const OutlineInputBorder(),
+                  ),
+                ),
+
+                SizedBox(height: screenHeight * 0.015),
+
+                // Description
+                TextField(
+                  maxLines: 3,
+                  decoration: InputDecoration(
+                    hintText: "Description",
+                    hintStyle: TextStyle(color: theme.hintColor),
+                    border: const OutlineInputBorder(),
+                  ),
+                ),
+                SizedBox(height: screenHeight * 0.03),
+
+                // Buttons
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Flexible(
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: theme.colorScheme.onSurface,
+                          padding: EdgeInsets.symmetric(
+                            vertical: screenHeight * 0.015,
+                            horizontal: screenWidth * 0.06,
+                          ),
+                        ),
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: const Text("Cancel"),
+                      ),
+                    ),
+                    SizedBox(width: screenWidth * 0.04),
+                    Flexible(
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: theme.colorScheme.primary,
+                          foregroundColor: theme.colorScheme.onPrimary,
+                          padding: EdgeInsets.symmetric(
+                            vertical: screenHeight * 0.015,
+                            horizontal: screenWidth * 0.06,
+                          ),
+                        ),
+                        onPressed: () {},
+                        child: const Text(
+                          "Upload",
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
-//Play button fade transition logic
+  // Play button fade transition logic
   void _startHideControlsTimer() {
     _hideControlsTimer?.cancel();
     _hideControlsTimer = Timer(const Duration(seconds: 1), () {
@@ -285,7 +306,7 @@ class _CustomDialogWidgetState extends State<CustomDialogWidget> {
     _startHideControlsTimer();
   }
 
-  //upload video logic
+  // Upload video logic
   void _pickVideo() async {
     _videoPath = await pickVideo();
     _initializeVideoPlayer();
@@ -300,26 +321,5 @@ class _CustomDialogWidgetState extends State<CustomDialogWidget> {
           ..play();
         _startHideControlsTimer();
       });
-  }
-
-//video preview widget
-  Widget _buildVideoPlayer() {
-    if (_videoController != null) {
-      return AspectRatio(
-        aspectRatio: _videoController!.value.aspectRatio,
-        child: VideoPlayer(_videoController!),
-      );
-    } else {
-      return const CircularProgressIndicator();
-    }
-  }
-
-  // Upload video logic
-  void _uploadVideo() async {
-    _downloadUrl = await FirebaseService().uploadVideo(_videoPath!);
-    await FirebaseService().saveVideoToUser(_downloadUrl!);
-    setState(() {
-      _videoPath = null;
-    });
   }
 }

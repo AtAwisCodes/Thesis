@@ -12,12 +12,15 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+
+  // Initialize Supabase and Firebase
   await Supabase.initialize(
-    url: "https://dsvxzjwnxwfcbxsljxdl.supabase.co",
+    url: 'https://ynjqcaxxofteqfbcnbpy.supabase.co',
     anonKey:
-        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRzdnh6andueHdmY2J4c2xqeGRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ5MDUyNjAsImV4cCI6MjA3MDQ4MTI2MH0.2TXC0QaAAswrgqO_Mz78at0FUlLOWLziRgrUqnzLQGY",
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InluanFjYXh4b2Z0ZXFmYmNuYnB5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ5OTUzNDEsImV4cCI6MjA3MDU3MTM0MX0.mSqnKhqSmrICZ5B2iCDcQgeOLF3xCgC1MnMnF1FbzMM',
   );
+
+  await Firebase.initializeApp();
 
   GetIt.instance.registerSingleton<FirebaseService>(FirebaseService());
 

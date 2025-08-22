@@ -1,6 +1,8 @@
+import 'dart:ui';
 import 'package:curved_navigation_bar/curved_navigation_bar.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import 'package:rexplore/pages/favorite_page.dart';
 import 'package:rexplore/pages/notif_page.dart';
@@ -23,126 +25,211 @@ void signUserOut() {
 }
 
 class _HomePageState extends State<HomePage> {
-  //defaultPage
   int page = 0;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    //Navigation Items
-    final List<Widget> navigationItems = [
-      Icon(Icons.home, color: theme.iconTheme.color),
-      Icon(Icons.favorite, color: theme.iconTheme.color),
-      Icon(Icons.add, color: theme.iconTheme.color),
-      Icon(Icons.notifications, color: theme.iconTheme.color),
-      CircleAvatar(
-        radius: 18,
-        backgroundColor: Colors.transparent,
-        backgroundImage: const AssetImage('lib/icons/ReXplore.png'),
-      ),
-    ];
-
     return Scaffold(
+      extendBody: true,
       backgroundColor: theme.scaffoldBackgroundColor,
+
       appBar: AppBar(
-        backgroundColor: theme.appBarTheme.backgroundColor,
-        automaticallyImplyLeading: page == 4,
+        automaticallyImplyLeading: false,
+        elevation: 0,
+        backgroundColor: Colors.transparent,
         title: Text(
           getAppBarTitle(page),
-          style: theme.appBarTheme.titleTextStyle,
+          style:
+              theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
         ),
+        centerTitle: false,
+        leading: page == 4
+            ? Builder(
+                builder: (context) => IconButton(
+                  icon: const Icon(Icons.menu),
+                  onPressed: () => Scaffold.of(context).openDrawer(),
+                ),
+              )
+            : null,
         actions: [
           if (page == 0)
             IconButton(
               icon: const Icon(Icons.search),
               onPressed: () {
-                showSearch(
-                  context: context,
-                  delegate: MySearchDelegate(),
-                );
+                showSearch(context: context, delegate: MySearchDelegate());
               },
             ),
         ],
       ),
 
-      //Drawer
+      // Drawer
+      // Drawer
       drawer: (page == 4)
           ? Drawer(
-              child: ListView(
-                padding: EdgeInsets.zero,
-                children: [
-                  UserAccountsDrawerHeader(
-                    accountName: const Text(''),
-                    accountEmail: const Text(''),
-                    currentAccountPicture: Container(
-                      decoration: BoxDecoration(
-                        borderRadius:
-                            const BorderRadius.all(Radius.circular(200)),
-                        border: Border.all(width: 2, color: Colors.white70),
+              child: StreamBuilder<DocumentSnapshot>(
+                stream: FirebaseFirestore.instance
+                    .collection("count")
+                    .doc(user.uid)
+                    .snapshots(),
+                builder: (context, snapshot) {
+                  String? avatarUrl;
+                  if (snapshot.hasData &&
+                      snapshot.data!.data() != null &&
+                      (snapshot.data!.data() as Map<String, dynamic>)
+                          .containsKey("avatar_url")) {
+                    avatarUrl = (snapshot.data!.data()
+                        as Map<String, dynamic>)["avatar_url"];
+                  }
+
+                  return ListView(
+                    padding: EdgeInsets.zero,
+                    children: [
+                      Container(
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [Colors.green, Colors.teal],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                        ),
+                        child: UserAccountsDrawerHeader(
+                          decoration:
+                              const BoxDecoration(color: Colors.transparent),
+                          accountName: Text(
+                            user.displayName ?? "User",
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          accountEmail: Text(user.email ?? ""),
+                          currentAccountPicture: CircleAvatar(
+                            radius: 30,
+                            backgroundColor: Colors.transparent,
+                            backgroundImage: avatarUrl != null
+                                ? NetworkImage(
+                                    "$avatarUrl?t=${DateTime.now().millisecondsSinceEpoch}")
+                                : const AssetImage('lib/icons/ReXplore.png')
+                                    as ImageProvider,
+                          ),
+                        ),
                       ),
-                      child: const CircleAvatar(
-                        backgroundImage: AssetImage('lib/icons/ReXplore.png'),
+                      SwitchListTile(
+                        title: const Text("Theme Mode"),
+                        value: Provider.of<ThemeProvider>(context).isDarkMode,
+                        onChanged: (val) {
+                          Provider.of<ThemeProvider>(context, listen: false)
+                              .toggleTheme(val);
+                        },
+                        secondary: const Icon(Icons.brightness_6),
                       ),
-                    ),
-                  ),
-                  SwitchListTile(
-                    title: const Text("Theme Mode"),
-                    value: Provider.of<ThemeProvider>(context).isDarkMode,
-                    onChanged: (val) {
-                      Provider.of<ThemeProvider>(context, listen: false)
-                          .toggleTheme(val);
-                    },
-                    secondary: const Icon(Icons.brightness_6),
-                  ),
-                  const ListTile(
-                    leading: Icon(Icons.info_outline),
-                    title: Text('About Us'),
-                  ),
-                  const ListTile(
-                    leading: Icon(Icons.library_books),
-                    title: Text('Library'),
-                  ),
-                  const ListTile(
-                    leading: Icon(Icons.settings),
-                    title: Text('Settings'),
-                  ),
-                  ListTile(
-                    leading: const Icon(Icons.logout),
-                    title: const Text('Logout'),
-                    onTap: signUserOut,
-                  ),
-                ],
+                      const ListTile(
+                        leading: Icon(Icons.info_outline),
+                        title: Text('About Us'),
+                      ),
+                      const ListTile(
+                        leading: Icon(Icons.library_books),
+                        title: Text('Library'),
+                      ),
+                      const ListTile(
+                        leading: Icon(Icons.settings),
+                        title: Text('Settings'),
+                      ),
+                      ListTile(
+                        leading: const Icon(Icons.logout),
+                        title: const Text('Logout'),
+                        onTap: signUserOut,
+                      ),
+                    ],
+                  );
+                },
               ),
             )
           : null,
 
-      body: Container(
-        color: theme.scaffoldBackgroundColor,
-        width: double.infinity,
-        height: double.infinity,
-        alignment: Alignment.center,
+      body: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 300),
         child: getSelectedWidget(page: page),
       ),
 
-      //Bottom Navigation
-      bottomNavigationBar: CurvedNavigationBar(
-        backgroundColor: Colors.transparent,
-        buttonBackgroundColor: theme.appBarTheme.backgroundColor ?? Colors.grey,
-        color: theme.appBarTheme.backgroundColor ?? Colors.white,
-        items: navigationItems,
-        animationDuration: const Duration(milliseconds: 300),
-        index: page,
-        onTap: (selectedIndex) {
-          setState(() {
-            page = selectedIndex;
-          });
-        },
+      bottomNavigationBar: Padding(
+        padding: const EdgeInsets.only(bottom: 0),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(25),
+              topRight: Radius.circular(25),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 10,
+                offset: const Offset(0, -2),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(25),
+              topRight: Radius.circular(25),
+            ),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 0, sigmaY: 0),
+              child: SizedBox(
+                height: 100,
+                child: StreamBuilder<DocumentSnapshot>(
+                  stream: FirebaseFirestore.instance
+                      .collection("count")
+                      .doc(user.uid)
+                      .snapshots(),
+                  builder: (context, snapshot) {
+                    String? avatarUrl;
+                    if (snapshot.hasData &&
+                        snapshot.data!.data() != null &&
+                        (snapshot.data!.data() as Map<String, dynamic>)
+                            .containsKey("avatar_url")) {
+                      avatarUrl = (snapshot.data!.data()
+                          as Map<String, dynamic>)["avatar_url"];
+                    }
+
+                    final List<Widget> navigationItems = [
+                      Icon(Icons.home, color: theme.iconTheme.color),
+                      Icon(Icons.favorite, color: theme.iconTheme.color),
+                      Icon(Icons.add_circle_outline,
+                          size: 30, color: theme.iconTheme.color),
+                      Icon(Icons.notifications, color: theme.iconTheme.color),
+                      CircleAvatar(
+                        radius: 18,
+                        backgroundColor: Colors.transparent,
+                        backgroundImage: avatarUrl != null
+                            ? NetworkImage(
+                                "$avatarUrl?t=${DateTime.now().millisecondsSinceEpoch}")
+                            : const AssetImage('lib/icons/ReXplore.png')
+                                as ImageProvider,
+                      ),
+                    ];
+
+                    return CurvedNavigationBar(
+                      backgroundColor: Colors.transparent,
+                      buttonBackgroundColor:
+                          theme.colorScheme.primary.withOpacity(0.9),
+                      color: theme.appBarTheme.backgroundColor ?? Colors.white,
+                      items: navigationItems,
+                      animationDuration: const Duration(milliseconds: 300),
+                      index: page,
+                      onTap: (selectedIndex) {
+                        setState(() => page = selectedIndex);
+                      },
+                    );
+                  },
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
 
-//appbar condition
   String getAppBarTitle(int page) {
     switch (page) {
       case 0:
@@ -160,34 +247,20 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-// NavigationSaHomePage
   Widget getSelectedWidget({required int page}) {
-    Widget widget;
     switch (page) {
       case 0:
-        widget = const VideosPage();
-        break;
-
+        return const VideosPage();
       case 1:
-        widget = const FavoritePage();
-        break;
-
+        return const FavoritePage();
       case 2:
-        widget = const UploadPage();
-        break;
-
+        return const UploadPage();
       case 3:
-        widget = const NotifPage();
-        break;
-
+        return const NotifPage();
       case 4:
-        widget = ProfilePage();
-        break;
-
+        return ProfilePage();
       default:
-        widget = const VideosPage();
-        break;
+        return const VideosPage();
     }
-    return widget;
   }
 }

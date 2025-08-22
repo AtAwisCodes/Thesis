@@ -1,14 +1,11 @@
-import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 
 class FirebaseService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseStorage _storage = FirebaseStorage.instance;
 
-  /// Create or update user account
+  /// Create or update user account in Firestore
   Future<bool> addUser({
     required String firstName,
     required String lastName,
@@ -25,6 +22,7 @@ class FirebaseService {
         'age': age,
         'email': email,
         'bio': bio,
+        'avatar_url': '',
         'created_at': FieldValue.serverTimestamp(),
       };
 
@@ -33,46 +31,6 @@ class FirebaseService {
     } catch (e) {
       print('Error creating user: $e');
       return false;
-    }
-  }
-
-  /// Upload video to Firebase Storage and get download URL
-  Future<String> uploadVideo(String filePath) async {
-    try {
-      final user = _auth.currentUser;
-      if (user == null) throw Exception('User not logged in');
-
-      final file = File(filePath);
-      final fileName = '${DateTime.now()}.mp4';
-      final ref = _storage.ref().child('videos/${user.uid}/$fileName');
-
-      await ref.putFile(file);
-      final downloadUrl = await ref.getDownloadURL();
-      return downloadUrl;
-    } catch (e) {
-      print('Error uploading video: $e');
-      rethrow;
-    }
-  }
-
-  /// Save video metadata under the user's document
-  Future<void> saveVideoToUser(String videoUrl,
-      {String videoName = 'User Video'}) async {
-    try {
-      final user = _auth.currentUser;
-      if (user == null) throw Exception('User not logged in');
-
-      await _firestore
-          .collection('count')
-          .doc(user.uid)
-          .collection('videos')
-          .add({
-        'url': videoUrl,
-        'name': videoName,
-        'timestamp': FieldValue.serverTimestamp(),
-      });
-    } catch (e) {
-      print('Error saving video metadata: $e');
     }
   }
 }
