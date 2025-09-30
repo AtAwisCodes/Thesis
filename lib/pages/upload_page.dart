@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:rexplore/utilities/uploadSelection.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:rexplore/services/upload_function.dart'; // New service file
 import 'package:video_player/video_player.dart';
 
 class UploadPage extends StatefulWidget {
@@ -42,16 +42,25 @@ class CustomDialogWidget extends StatefulWidget {
 }
 
 class _CustomDialogWidgetState extends State<CustomDialogWidget> {
-  final _future = Supabase.instance.client.from('').select();
   String? _videoPath;
   VideoPlayerController? _videoController;
   Timer? _hideControlsTimer;
   bool _showControls = true;
+  bool _isUploading = false;
+  double _uploadProgress = 0.0;
+  String _uploadStatus = '';
+
+  final TextEditingController _titleController = TextEditingController();
+  final TextEditingController _descriptionController = TextEditingController();
+
+  final VideoUploadService _uploadService = VideoUploadService();
 
   @override
   void dispose() {
     _videoController?.dispose();
     _hideControlsTimer?.cancel();
+    _titleController.dispose();
+    _descriptionController.dispose();
     super.dispose();
   }
 
@@ -153,7 +162,7 @@ class _CustomDialogWidgetState extends State<CustomDialogWidget> {
                                       ),
                                     ),
                                   ),
-                                  // Play/Pause Icon with Fade
+                                  // Play/Pause Icon
                                   Center(
                                     child: AnimatedOpacity(
                                       duration:
@@ -174,9 +183,11 @@ class _CustomDialogWidgetState extends State<CustomDialogWidget> {
                                     top: 8,
                                     right: 8,
                                     child: InkWell(
-                                      onTap: () {
-                                        _pickVideo();
-                                      },
+                                      onTap: _isUploading
+                                          ? null
+                                          : () {
+                                              _pickVideo();
+                                            },
                                       borderRadius: BorderRadius.circular(30),
                                       child: Container(
                                         padding: const EdgeInsets.all(6),
@@ -187,7 +198,10 @@ class _CustomDialogWidgetState extends State<CustomDialogWidget> {
                                         ),
                                         child: Icon(
                                           Icons.change_circle,
-                                          color: theme.colorScheme.primary,
+                                          color: _isUploading
+                                              ? theme.colorScheme.onSurface
+                                                  .withOpacity(0.3)
+                                              : theme.colorScheme.primary,
                                           size: constraints.maxHeight * 0.15,
                                         ),
                                       ),
@@ -199,13 +213,80 @@ class _CustomDialogWidgetState extends State<CustomDialogWidget> {
                           },
                         )
                       : OutlinedButton(
-                          onPressed: _pickVideo,
+                          onPressed: _isUploading ? null : _pickVideo,
                           child: const Text("Select Video from File"),
                         ),
                 ),
 
                 SizedBox(height: screenHeight * 0.03),
 
+                // Upload Progress Section
+                if (_isUploading) ...[
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color:
+                          theme.colorScheme.primaryContainer.withOpacity(0.3),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: theme.colorScheme.primary.withOpacity(0.3),
+                      ),
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                            SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  theme.colorScheme.primary,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              'Uploading...',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        LinearProgressIndicator(
+                          value: _uploadProgress,
+                          backgroundColor:
+                              theme.colorScheme.onSurface.withOpacity(0.1),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            theme.colorScheme.primary,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              _uploadStatus,
+                              style: theme.textTheme.bodySmall,
+                            ),
+                            Text(
+                              '${(_uploadProgress * 100).toInt()}%',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(height: screenHeight * 0.02),
+                ],
+
+                // Details Section
                 Row(
                   mainAxisAlignment: MainAxisAlignment.start,
                   children: [
@@ -217,17 +298,19 @@ class _CustomDialogWidgetState extends State<CustomDialogWidget> {
                     ),
                   ],
                 ),
-
                 SizedBox(height: screenHeight * 0.015),
 
                 // Title Input
                 TextField(
+                  controller: _titleController,
+                  enabled: !_isUploading,
                   decoration: InputDecoration(
-                    hintText: "Title (required)",
+                    hintText: "Title",
                     hintStyle: TextStyle(
                       color: theme.hintColor,
                     ),
                     border: const OutlineInputBorder(),
+                    prefixIcon: const Icon(Icons.title),
                   ),
                 ),
 
@@ -235,11 +318,14 @@ class _CustomDialogWidgetState extends State<CustomDialogWidget> {
 
                 // Description
                 TextField(
+                  controller: _descriptionController,
+                  enabled: !_isUploading,
                   maxLines: 3,
                   decoration: InputDecoration(
                     hintText: "Description",
                     hintStyle: TextStyle(color: theme.hintColor),
                     border: const OutlineInputBorder(),
+                    prefixIcon: const Icon(Icons.description),
                   ),
                 ),
                 SizedBox(height: screenHeight * 0.03),
@@ -257,7 +343,9 @@ class _CustomDialogWidgetState extends State<CustomDialogWidget> {
                             horizontal: screenWidth * 0.06,
                           ),
                         ),
-                        onPressed: () => Navigator.of(context).pop(),
+                        onPressed: _isUploading
+                            ? null
+                            : () => Navigator.of(context).pop(),
                         child: const Text("Cancel"),
                       ),
                     ),
@@ -265,18 +353,30 @@ class _CustomDialogWidgetState extends State<CustomDialogWidget> {
                     Flexible(
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: theme.colorScheme.primary,
+                          backgroundColor: _isUploading
+                              ? theme.colorScheme.onSurface.withOpacity(0.3)
+                              : theme.colorScheme.primary,
                           foregroundColor: theme.colorScheme.onPrimary,
                           padding: EdgeInsets.symmetric(
                             vertical: screenHeight * 0.015,
                             horizontal: screenWidth * 0.06,
                           ),
                         ),
-                        onPressed: () {},
-                        child: const Text(
-                          "Upload",
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
+                        onPressed: _isUploading ? null : _uploadVideo,
+                        child: _isUploading
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.white),
+                                ),
+                              )
+                            : const Text(
+                                "Upload",
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
                       ),
                     ),
                   ],
@@ -289,13 +389,15 @@ class _CustomDialogWidgetState extends State<CustomDialogWidget> {
     );
   }
 
-  // Play button fade transition logic
+  // Hide / Show controls timer
   void _startHideControlsTimer() {
     _hideControlsTimer?.cancel();
     _hideControlsTimer = Timer(const Duration(seconds: 1), () {
-      setState(() {
-        _showControls = false;
-      });
+      if (mounted) {
+        setState(() {
+          _showControls = false;
+        });
+      }
     });
   }
 
@@ -306,20 +408,114 @@ class _CustomDialogWidgetState extends State<CustomDialogWidget> {
     _startHideControlsTimer();
   }
 
-  // Upload video logic
+  // Video picking
   void _pickVideo() async {
-    _videoPath = await pickVideo();
-    _initializeVideoPlayer();
+    try {
+      _videoPath = await pickVideo();
+      if (_videoPath != null) {
+        _initializeVideoPlayer();
+      }
+    } catch (e) {
+      _showError('Failed to pick video: $e');
+    }
   }
 
   void _initializeVideoPlayer() {
+    _videoController?.dispose();
     _videoController = VideoPlayerController.file(File(_videoPath!))
       ..initialize().then((_) {
-        setState(() {});
-        _videoController!
-          ..setLooping(true)
-          ..play();
-        _startHideControlsTimer();
+        if (mounted) {
+          setState(() {});
+          _videoController!
+            ..setLooping(true)
+            ..play();
+          _startHideControlsTimer();
+        }
+      }).catchError((error) {
+        _showError('Failed to initialize video player: $error');
       });
+  }
+
+  // Upload function with progress tracking
+  Future<void> _uploadVideo() async {
+    if (_videoPath == null || _titleController.text.trim().isEmpty) {
+      _showError("Please select a video and enter a title");
+      return;
+    }
+
+    setState(() {
+      _isUploading = true;
+      _uploadProgress = 0.0;
+      _uploadStatus = 'Preparing upload...';
+    });
+
+    try {
+      final result = await _uploadService.uploadVideoWithProgress(
+        videoPath: _videoPath!,
+        title: _titleController.text.trim(),
+        description: _descriptionController.text.trim(),
+        onProgress: (progress, status) {
+          if (mounted) {
+            setState(() {
+              _uploadProgress = progress;
+              _uploadStatus = status;
+            });
+          }
+        },
+      );
+
+      if (result.success) {
+        _showSuccess("Upload successful!");
+        Navigator.of(context).pop();
+      } else {
+        _showError(result.error ?? "Upload failed");
+      }
+    } catch (e) {
+      _showError("Upload failed: $e");
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploading = false;
+          _uploadProgress = 0.0;
+          _uploadStatus = '';
+        });
+      }
+    }
+  }
+
+  void _showError(String message) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.error_outline, color: Colors.white),
+              const SizedBox(width: 8),
+              Expanded(child: Text(message)),
+            ],
+          ),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    }
+  }
+
+  void _showSuccess(String message) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.check_circle_outline, color: Colors.white),
+              const SizedBox(width: 8),
+              Expanded(child: Text(message)),
+            ],
+          ),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
   }
 }

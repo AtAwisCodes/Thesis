@@ -1,5 +1,4 @@
 import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:image_picker/image_picker.dart';
@@ -9,10 +8,10 @@ class cameraFunc extends StatefulWidget {
   const cameraFunc({super.key, required this.camera});
 
   @override
-  State<cameraFunc> createState() => _CameraFuncState();
+  State<cameraFunc> createState() => _cameraFuncState();
 }
 
-class _CameraFuncState extends State<cameraFunc> {
+class _cameraFuncState extends State<cameraFunc> {
   late CameraController controller;
   final ImagePicker _picker = ImagePicker();
   XFile? _galleryImage;
@@ -20,7 +19,11 @@ class _CameraFuncState extends State<cameraFunc> {
   @override
   void initState() {
     super.initState();
-    controller = CameraController(widget.camera, ResolutionPreset.high);
+    controller = CameraController(
+      widget.camera,
+      ResolutionPreset.high,
+      enableAudio: false,
+    );
     controller.initialize().then((_) {
       if (!mounted) return;
       setState(() {});
@@ -53,9 +56,6 @@ class _CameraFuncState extends State<cameraFunc> {
 
   @override
   Widget build(BuildContext context) {
-    final screenHeight = MediaQuery.of(context).size.height;
-    final screenWidth = MediaQuery.of(context).size.width;
-
     if (!controller.value.isInitialized) {
       return const Scaffold(
         backgroundColor: Colors.black,
@@ -65,106 +65,104 @@ class _CameraFuncState extends State<cameraFunc> {
 
     return Scaffold(
       backgroundColor: Colors.black,
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Top App Bar
-            Container(
-              color: Colors.black,
-              height: screenHeight * 0.1,
-              alignment: Alignment.centerLeft,
-              padding: const EdgeInsets.only(left: 16),
+      body: Stack(
+        children: [
+          // ✅ Fullscreen Camera Preview
+          SizedBox.expand(
+            child: FittedBox(
+              fit: BoxFit.cover,
+              child: SizedBox(
+                width: controller.value.previewSize!.height,
+                height: controller.value.previewSize!.width,
+                child: CameraPreview(controller),
+              ),
+            ),
+          ),
+
+          // Top bar
+          SafeArea(
+            child: Align(
+              alignment: Alignment.topLeft,
               child: IconButton(
                 icon: const Icon(Icons.close, color: Colors.white, size: 28),
                 onPressed: () => Navigator.pop(context),
               ),
             ),
-            const SizedBox(height: 50),
+          ),
 
-            // Camera Preview (Square, Centered)
-            AspectRatio(
-              aspectRatio: 1,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: CameraPreview(controller),
-              ),
-            ),
-
-            // Spacer below the camera
-            const SizedBox(height: 80),
-
-            // Bottom Control Panel
-            Expanded(
-              child: Container(
-                width: double.infinity,
-                color: Colors.black,
-                padding: const EdgeInsets.symmetric(horizontal: 30),
-                child: Column(
-                  children: [
-                    const Text(
-                      'PHOTO',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        letterSpacing: 1.5,
-                        fontWeight: FontWeight.bold,
-                      ),
+          // Bottom controls
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: Container(
+              color: Colors.black.withOpacity(0.3),
+              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'PHOTO',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      letterSpacing: 1.5,
+                      fontWeight: FontWeight.bold,
                     ),
-                    const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        // Gallery icon
-                        GestureDetector(
-                          onTap: _pickFromGallery,
-                          child: _galleryImage != null
-                              ? ClipRRect(
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: Image.file(
-                                    File(_galleryImage!.path),
-                                    width: 50,
-                                    height: 50,
-                                    fit: BoxFit.cover,
-                                  ),
-                                )
-                              : Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: Colors.white12,
-                                    boxShadow: [
-                                      BoxShadow(
-                                          color: Colors.white.withOpacity(0.2),
-                                          blurRadius: 6)
-                                    ],
-                                  ),
-                                  child: const Icon(Icons.image,
-                                      size: 32, color: Colors.white),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // Gallery icon
+                      GestureDetector(
+                        onTap: _pickFromGallery,
+                        child: _galleryImage != null
+                            ? ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Image.file(
+                                  File(_galleryImage!.path),
+                                  width: 50,
+                                  height: 50,
+                                  fit: BoxFit.cover,
                                 ),
-                        ),
+                              )
+                            : Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Colors.white12,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.white.withOpacity(0.2),
+                                      blurRadius: 6,
+                                    )
+                                  ],
+                                ),
+                                child: const Icon(Icons.image,
+                                    size: 32, color: Colors.white),
+                              ),
+                      ),
 
-                        // Capture button
-                        GestureDetector(
-                          onTap: _captureImage,
-                          child: Container(
-                            width: 70,
-                            height: 70,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white, width: 4),
-                            ),
+                      // Capture button
+                      GestureDetector(
+                        onTap: _captureImage,
+                        child: Container(
+                          width: 70,
+                          height: 70,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 4),
                           ),
                         ),
+                      ),
 
-                        const SizedBox(width: 50), // Spacer to balance layout
-                      ],
-                    ),
-                  ],
-                ),
+                      const SizedBox(width: 50), // Spacer
+                    ],
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

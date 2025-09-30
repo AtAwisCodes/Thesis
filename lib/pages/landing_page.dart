@@ -88,7 +88,6 @@ class _LandingPage extends State<LandingPage> {
                 showDialog(
                     context: context, builder: (context) => const AuthPage());
               },
-              child: Text("Get Started"),
               style: ElevatedButton.styleFrom(
                 padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                 backgroundColor: Colors.green[700],
@@ -97,6 +96,7 @@ class _LandingPage extends State<LandingPage> {
                   borderRadius: BorderRadius.circular(8),
                 ),
               ),
+              child: Text("Get Started"),
             ),
           ],
         ),

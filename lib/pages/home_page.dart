@@ -24,6 +24,9 @@ void signUserOut() {
   FirebaseAuth.instance.signOut();
 }
 
+//Const fallback avatar image
+const ImageProvider defaultAvatar = AssetImage('lib/icons/ReXplore.png');
+
 class _HomePageState extends State<HomePage> {
   int page = 0;
 
@@ -64,7 +67,6 @@ class _HomePageState extends State<HomePage> {
         ],
       ),
 
-      // Drawer
       // Drawer
       drawer: (page == 4)
           ? Drawer(
@@ -108,8 +110,7 @@ class _HomePageState extends State<HomePage> {
                             backgroundImage: avatarUrl != null
                                 ? NetworkImage(
                                     "$avatarUrl?t=${DateTime.now().millisecondsSinceEpoch}")
-                                : const AssetImage('lib/icons/ReXplore.png')
-                                    as ImageProvider,
+                                : defaultAvatar,
                           ),
                         ),
                       ),
@@ -192,19 +193,37 @@ class _HomePageState extends State<HomePage> {
                     }
 
                     final List<Widget> navigationItems = [
-                      Icon(Icons.home, color: theme.iconTheme.color),
-                      Icon(Icons.favorite, color: theme.iconTheme.color),
-                      Icon(Icons.add_circle_outline,
-                          size: 30, color: theme.iconTheme.color),
-                      Icon(Icons.notifications, color: theme.iconTheme.color),
+                      Icon(
+                        page == 0 ? Icons.home : Icons.home_outlined,
+                        color: theme.iconTheme.color,
+                      ),
+                      Icon(
+                        page == 1 ? Icons.favorite : Icons.favorite_border,
+                        color: theme.iconTheme.color,
+                      ),
+                      Icon(
+                        page == 2 ? Icons.add_circle : Icons.add_circle_outline,
+                        size: 30,
+                        color: theme.iconTheme.color,
+                      ),
+                      Icon(
+                        page == 3
+                            ? Icons.notifications
+                            : Icons.notifications_none,
+                        color: theme.iconTheme.color,
+                      ),
                       CircleAvatar(
                         radius: 18,
-                        backgroundColor: Colors.transparent,
-                        backgroundImage: avatarUrl != null
-                            ? NetworkImage(
-                                "$avatarUrl?t=${DateTime.now().millisecondsSinceEpoch}")
-                            : const AssetImage('lib/icons/ReXplore.png')
-                                as ImageProvider,
+                        backgroundColor: page == 4
+                            ? theme.colorScheme.primary
+                            : Colors.grey.shade200,
+                        child: CircleAvatar(
+                          radius: 16,
+                          backgroundImage: avatarUrl != null
+                              ? NetworkImage(
+                                  "$avatarUrl?t=${DateTime.now().millisecondsSinceEpoch}")
+                              : defaultAvatar,
+                        ),
                       ),
                     ];
 

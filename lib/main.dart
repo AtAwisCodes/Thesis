@@ -21,9 +21,7 @@ void main() async {
   );
 
   await Firebase.initializeApp();
-
   GetIt.instance.registerSingleton<FirebaseService>(FirebaseService());
-
   runApp(
     MultiProvider(
       providers: [

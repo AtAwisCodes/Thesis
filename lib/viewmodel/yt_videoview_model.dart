@@ -7,6 +7,8 @@ class YtVideoviewModel extends ChangeNotifier {
   String? nextPageToken;
   bool isLoading = false;
 
+  get allVideos => null;
+
   Future<void> getAllVideos({bool loadMore = false}) async {
     if (isLoading) return;
     isLoading = true;
@@ -28,4 +30,6 @@ class YtVideoviewModel extends ChangeNotifier {
     isLoading = false;
     notifyListeners();
   }
+
+  void getUploadedVideos() {}
 }

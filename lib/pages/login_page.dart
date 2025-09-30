@@ -19,11 +19,6 @@ class _LoginPageState extends State<LoginPage> {
   final passwordController = TextEditingController();
 
   void signInUser() async {
-    showDialog(
-      context: context,
-      builder: (context) => const Center(child: CircularProgressIndicator()),
-    );
-
     try {
       await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: emailController.text.trim(),
@@ -53,43 +48,52 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.sizeOf(context).width;
-    final screenHeight = MediaQuery.sizeOf(context).height;
-
     return Dialog(
       backgroundColor: Colors.transparent,
-      child: Stack(
-        children: [
-          CardDialog(screenWidth: screenWidth, screenHeight: screenHeight),
-          Positioned(
-            top: 0,
-            right: screenWidth * 0.04,
-            height: 28,
-            width: 28,
-            child: OutlinedButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              style: OutlinedButton.styleFrom(
-                padding: EdgeInsets.all(screenWidth * 0.01),
-                shape: const CircleBorder(),
-                backgroundColor: Colors.transparent,
-                side: BorderSide(color: Colors.transparent),
-              ),
-              child: Icon(
-                Icons.cancel,
-                size: screenWidth * 0.07,
-              ),
-            ),
-          )
-        ],
+      insetPadding: const EdgeInsets.all(12),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          double screenWidth = constraints.maxWidth;
+          double screenHeight = constraints.maxHeight;
+
+          // Clamp text sizes
+          double titleSize = (screenWidth * 0.08).clamp(20, 32);
+          double subtitleSize = (screenWidth * 0.04).clamp(14, 18);
+          double textSize = (screenWidth * 0.032).clamp(12, 16);
+
+          return Stack(
+            children: [
+              _cardDialog(
+                  screenWidth, screenHeight, titleSize, subtitleSize, textSize),
+              Positioned(
+                top: 0,
+                right: screenWidth * 0.04,
+                height: screenHeight * 0.04,
+                width: screenHeight * 0.04,
+                child: OutlinedButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                  style: OutlinedButton.styleFrom(
+                    padding: EdgeInsets.all(screenHeight * 0.005),
+                    shape: const CircleBorder(),
+                    backgroundColor: Colors.transparent,
+                    side: BorderSide.none,
+                  ),
+                  child: Icon(Icons.cancel, size: screenHeight * 0.035),
+                ),
+              )
+            ],
+          );
+        },
       ),
     );
   }
 
-  Widget CardDialog(
-      {required double screenWidth, required double screenHeight}) {
+  Widget _cardDialog(double screenWidth, double screenHeight, double titleSize,
+      double subtitleSize, double textSize) {
     return Container(
+      constraints: const BoxConstraints(maxWidth: 500), // prevents stretching
       padding: EdgeInsets.symmetric(
         vertical: screenHeight * 0.02,
         horizontal: screenWidth * 0.06,
@@ -99,146 +103,148 @@ class _LoginPageState extends State<LoginPage> {
         color: const Color(0xff2A303E),
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Center(
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                'Welcome!',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: screenWidth * 0.08,
-                  fontWeight: FontWeight.bold,
+      child: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  'Welcome!',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: titleSize,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-              Text(
-                'Login to your account!',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: screenWidth * 0.04,
+                Text(
+                  'Login to your account!',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: subtitleSize,
+                  ),
                 ),
-              ),
-              SizedBox(height: screenHeight * 0.03),
+                SizedBox(height: screenHeight * 0.03),
 
-              // Email
-              MyTextfield(
-                controller: emailController,
-                hintText: 'Email',
-                obscureText: false,
-              ),
-              SizedBox(height: screenHeight * 0.015),
+                // Email
+                MyTextfield(
+                  controller: emailController,
+                  hintText: 'Email',
+                  obscureText: false,
+                ),
+                SizedBox(height: screenHeight * 0.015),
 
-              // Password
-              MyTextfield(
-                controller: passwordController,
-                hintText: 'Password',
-                obscureText: true,
-              ),
-              SizedBox(height: screenHeight * 0.015),
+                // Password
+                MyTextfield(
+                  controller: passwordController,
+                  hintText: 'Password',
+                  obscureText: true,
+                ),
+                SizedBox(height: screenHeight * 0.015),
 
-              // Forgot Password
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.01),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
+                // Forgot Password
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    'Forgot Password?',
+                    style:
+                        TextStyle(color: Colors.grey[600], fontSize: textSize),
+                  ),
+                ),
+                SizedBox(height: screenHeight * 0.02),
+
+                // Sign In Button
+                MyButton(text: "Sign In", onTap: signInUser),
+                SizedBox(height: screenHeight * 0.03),
+
+                // Divider
+                Row(
                   children: [
-                    Text(
-                      'Forgot Password?',
-                      style: TextStyle(color: Colors.grey[600]),
+                    const Expanded(child: Divider(color: Colors.white)),
+                    Padding(
+                      padding:
+                          EdgeInsets.symmetric(horizontal: screenWidth * 0.015),
+                      child: Text('Or continue with',
+                          style: TextStyle(
+                              color: Colors.white, fontSize: textSize)),
+                    ),
+                    const Expanded(child: Divider(color: Colors.white)),
+                  ],
+                ),
+                SizedBox(height: screenHeight * 0.03),
+
+                // Google Button
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    SquareTile(
+                      onTap: () async {
+                        try {
+                          final userCredential =
+                              await AuthService().signInWithGoogle();
+                          if (userCredential != null) {
+                            Navigator.of(context).pop(); // close login dialog
+                            Navigator.pushReplacement(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (context) => const HomePage()),
+                            );
+                          }
+                        } catch (e) {
+                          showDialog(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              backgroundColor: Colors.deepPurple,
+                              title: const Center(
+                                child: Text(
+                                  'Google sign-in failed',
+                                  style: TextStyle(color: Colors.white),
+                                ),
+                              ),
+                              content: Text(
+                                e.toString(),
+                                style: const TextStyle(color: Colors.white),
+                              ),
+                            ),
+                          );
+                        }
+                      },
+                      imagePath: 'lib/icons/Google.png',
                     )
                   ],
                 ),
-              ),
-              SizedBox(height: screenHeight * 0.02),
+                SizedBox(height: screenHeight * 0.03),
 
-              // Sign In Button
-              MyButton(text: "Sign In", onTap: signInUser),
-              SizedBox(height: screenHeight * 0.03),
-
-              // Divider
-              Row(
-                children: [
-                  Expanded(child: Divider(color: Colors.white)),
-                  Padding(
-                    padding:
-                        EdgeInsets.symmetric(horizontal: screenWidth * 0.015),
-                    child: Text('Or continue with',
-                        style: TextStyle(color: Colors.white)),
-                  ),
-                  Expanded(child: Divider(color: Colors.white)),
-                ],
-              ),
-              SizedBox(height: screenHeight * 0.03),
-
-              // Google Button
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  SquareTile(
-                    onTap: () async {
-                      try {
-                        final userCredential =
-                            await AuthService().signInWithGoogle();
-                        if (userCredential != null) {
-                          Navigator.of(context).pop(); // close login dialog
-                          Navigator.pushReplacement(
-                            context,
-                            MaterialPageRoute(
-                                builder: (context) => const HomePage()),
-                          );
-                        }
-                      } catch (e) {
-                        showDialog(
-                          context: context,
-                          builder: (context) => AlertDialog(
-                            backgroundColor: Colors.deepPurple,
-                            title: const Center(
-                              child: Text(
-                                'Google sign-in failed',
-                                style: TextStyle(color: Colors.white),
-                              ),
-                            ),
-                            content: Text(
-                              e.toString(),
-                              style: const TextStyle(color: Colors.white),
-                            ),
-                          ),
-                        );
-                      }
-                    },
-                    imagePath: 'lib/icons/Google.png',
-                  )
-                ],
-              ),
-              SizedBox(height: screenHeight * 0.03),
-
-              // Don't have an account
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    'Don\'t have an account yet?',
-                    style: TextStyle(
-                      color: Colors.grey[700],
-                      fontSize: screenWidth * 0.03,
-                    ),
-                  ),
-                  SizedBox(width: screenWidth * 0.015),
-                  GestureDetector(
-                    onTap: widget.onTap,
-                    child: Text(
-                      'Register now',
-                      style: TextStyle(
-                        color: Colors.blue,
-                        fontWeight: FontWeight.bold,
-                        fontSize: screenWidth * 0.032,
+                // Don't have an account
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        'Don\'t have an account yet?',
+                        style: TextStyle(
+                          color: Colors.grey[700],
+                          fontSize: textSize,
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                  ),
-                ],
-              )
-            ],
+                    SizedBox(width: screenWidth * 0.02),
+                    GestureDetector(
+                      onTap: widget.onTap,
+                      child: Text(
+                        'Register',
+                        style: TextStyle(
+                          color: Colors.blue,
+                          fontWeight: FontWeight.bold,
+                          fontSize: textSize,
+                        ),
+                      ),
+                    ),
+                  ],
+                )
+              ],
+            ),
           ),
         ),
       ),

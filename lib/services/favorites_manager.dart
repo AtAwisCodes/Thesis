@@ -84,4 +84,12 @@ class FavoritesManager extends ChangeNotifier {
   void disposeManager() {
     _favoritesSub?.cancel();
   }
+
+  isFavorite(String videoUrl) {}
+
+  isDisliked(String videoUrl) {}
+
+  removeDislike(String videoUrl) {}
+
+  addDislike(String videoUrl) {}
 }
