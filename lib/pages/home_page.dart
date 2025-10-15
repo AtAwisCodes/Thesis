@@ -1,4 +1,5 @@
 import 'dart:ui';
+import 'package:camera/camera.dart';
 import 'package:curved_navigation_bar/curved_navigation_bar.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -11,6 +12,7 @@ import 'package:rexplore/pages/upload_page.dart';
 import 'package:rexplore/pages/videos_page.dart';
 import 'package:rexplore/pages/search_bar.dart';
 import 'package:rexplore/services/ThemeProvider.dart';
+import 'package:rexplore/image_recognition/cam_func.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -151,6 +153,38 @@ class _HomePageState extends State<HomePage> {
         duration: const Duration(milliseconds: 300),
         child: getSelectedWidget(page: page),
       ),
+
+      //Camera Floating Action Button AI - Only visible on home page
+      floatingActionButton: page == 0
+          ? Padding(
+              padding: const EdgeInsets.only(bottom: 0),
+              child: FloatingActionButton(
+                onPressed: () async {
+                  final cameras = await availableCameras();
+                  if (cameras.isNotEmpty) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => cameraFunc(camera: cameras[0]),
+                      ),
+                    );
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('No cameras found')),
+                    );
+                  }
+                },
+                backgroundColor: theme.colorScheme.primary,
+                elevation: 6,
+                child: const Icon(
+                  Icons.camera_alt_rounded,
+                  color: Colors.white,
+                  size: 28,
+                ),
+              ),
+            )
+          : null,
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
 
       bottomNavigationBar: Padding(
         padding: const EdgeInsets.only(bottom: 0),

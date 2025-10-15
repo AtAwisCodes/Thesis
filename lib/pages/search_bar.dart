@@ -1,6 +1,4 @@
-import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
-import 'package:rexplore/image_recognition/cam_func.dart';
 
 class Search extends StatefulWidget {
   const Search({super.key});
@@ -37,26 +35,7 @@ class MySearchDelegate extends SearchDelegate {
       );
 
   @override
-  List<Widget>? buildActions(BuildContext context) => [
-        IconButton(
-          icon: const Icon(Icons.camera_alt_rounded, color: Colors.green),
-          onPressed: () async {
-            final cameras = await availableCameras();
-            if (cameras.isNotEmpty) {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => cameraFunc(camera: cameras[0]),
-                ),
-              );
-            } else {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('No cameras found')),
-              );
-            }
-          },
-        )
-      ];
+  List<Widget>? buildActions(BuildContext context) => [];
 
   @override
   Widget buildResults(BuildContext context) => Center(
