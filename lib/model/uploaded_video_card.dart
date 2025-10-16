@@ -54,7 +54,8 @@ class UploadedVideoCard extends StatelessWidget {
               avatarUrl: avatarUrl,
               firstName: firstName,
               lastName: lastName,
-              videoId: "",
+              videoId:
+                  videos["id"] ?? "", // ✅ Use actual video ID from Firestore
             ),
           ),
         );

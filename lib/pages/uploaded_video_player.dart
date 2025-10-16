@@ -4,10 +4,12 @@ import 'package:video_player/video_player.dart';
 import 'package:rexplore/services/favorites_manager.dart';
 import 'package:rexplore/augmented_reality/augmented_camera.dart';
 import 'package:rexplore/services/upload_function.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class UploadedVideoPlayer extends StatefulWidget {
   final String videoUrl;
-  final String videoId; // Added videoId to pass to AR camera
+  final String videoId;
   final String title;
   final String uploadedAt;
   final String avatarUrl;
@@ -17,7 +19,7 @@ class UploadedVideoPlayer extends StatefulWidget {
   const UploadedVideoPlayer({
     super.key,
     required this.videoUrl,
-    required this.videoId, // Make sure videoId is passed
+    required this.videoId,
     required this.title,
     required this.uploadedAt,
     required this.avatarUrl,
@@ -31,9 +33,11 @@ class UploadedVideoPlayer extends StatefulWidget {
 
 class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
   late VideoPlayerController _controller;
-  final List<String> comments = [];
+  final List<Map<String, dynamic>> comments = [];
   final _commentController = TextEditingController();
   final VideoUploadService _uploadService = VideoUploadService();
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
   bool isFollowed = false;
   bool isLiked = false;
@@ -41,10 +45,19 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
   bool _has3DModel = false;
   bool _isCheckingModel = true;
   String? _modelError;
+  bool _isLoadingComments = true;
 
   @override
   void initState() {
     super.initState();
+
+    print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    print('📹 UploadedVideoPlayer initialized');
+    print('Video ID: ${widget.videoId}');
+    print('Video URL: ${widget.videoUrl}');
+    print('Title: ${widget.title}');
+    print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
     _controller = VideoPlayerController.network(widget.videoUrl)
       ..initialize().then((_) {
         if (mounted) {
@@ -58,6 +71,9 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
 
     // Check 3D model status
     _check3DModelStatus();
+
+    // Load comments
+    _loadComments();
   }
 
   Future<void> _check3DModelStatus() async {
@@ -93,6 +109,175 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
         setState(() {
           _isCheckingModel = false;
         });
+      }
+    }
+  }
+
+  // Load comments from Firestore
+  Future<void> _loadComments() async {
+    if (widget.videoId.isEmpty) {
+      print('❌ Cannot load comments: Video ID is empty');
+      if (mounted) {
+        setState(() {
+          _isLoadingComments = false;
+        });
+      }
+      return;
+    }
+
+    try {
+      print('📝 Loading comments for video: ${widget.videoId}');
+      print('📍 Path: videos/${widget.videoId}/comments');
+
+      final snapshot = await _firestore
+          .collection('videos')
+          .doc(widget.videoId)
+          .collection('comments')
+          .orderBy('timestamp', descending: true)
+          .get();
+
+      print('✅ Found ${snapshot.docs.length} comments');
+
+      if (mounted) {
+        setState(() {
+          comments.clear();
+          for (var doc in snapshot.docs) {
+            final data = doc.data();
+            print(
+                '💬 Comment: ${data['comment']} by ${data['firstName']} ${data['lastName']}');
+            comments.add({
+              'id': doc.id,
+              ...data,
+            });
+          }
+          _isLoadingComments = false;
+        });
+      }
+    } catch (e) {
+      print('⚠️ Error loading comments with ordering: $e');
+      // If ordering fails, try without ordering
+      try {
+        print('🔄 Retrying without ordering...');
+        final snapshot = await _firestore
+            .collection('videos')
+            .doc(widget.videoId)
+            .collection('comments')
+            .get();
+
+        print('✅ Loaded ${snapshot.docs.length} comments without ordering');
+
+        if (mounted) {
+          setState(() {
+            comments.clear();
+            for (var doc in snapshot.docs) {
+              comments.add({
+                'id': doc.id,
+                ...doc.data(),
+              });
+            }
+            _isLoadingComments = false;
+          });
+        }
+      } catch (e2) {
+        print('❌ Error loading comments without ordering: $e2');
+        if (mounted) {
+          setState(() {
+            _isLoadingComments = false;
+          });
+        }
+      }
+    }
+  }
+
+  // Add a new comment to Firestore
+  Future<void> _addComment(String commentText) async {
+    if (widget.videoId.isEmpty) {
+      print('❌ Cannot add comment: Video ID is empty');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Error: Video ID is missing. Cannot add comment.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
+    try {
+      final user = _auth.currentUser;
+      if (user == null) {
+        print('❌ User not logged in');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Please login to comment')),
+          );
+        }
+        return;
+      }
+
+      print('📤 Adding comment for user: ${user.uid}');
+      print('📍 Video ID: ${widget.videoId}');
+
+      // Get user info from Firestore
+      final userDoc = await _firestore.collection('count').doc(user.uid).get();
+
+      if (!userDoc.exists) {
+        print('⚠️ User document not found in Firestore');
+      }
+
+      final userData = userDoc.data();
+      print('👤 User data: $userData');
+
+      final String firstName = userData?['first_name'] ?? 'Anonymous';
+      final String lastName = userData?['last_name'] ?? '';
+      final String avatarUrl = userData?['avatar_url'] ?? '';
+
+      // Add comment to Firestore
+      final commentData = {
+        'userId': user.uid,
+        'firstName': firstName,
+        'lastName': lastName,
+        'avatarUrl': avatarUrl,
+        'comment': commentText,
+        'timestamp': FieldValue.serverTimestamp(),
+      };
+
+      print('💾 Saving comment to: videos/${widget.videoId}/comments');
+      print('📝 Comment data: $commentData');
+
+      final docRef = await _firestore
+          .collection('videos')
+          .doc(widget.videoId)
+          .collection('comments')
+          .add(commentData);
+
+      print('✅ Comment added with ID: ${docRef.id}');
+
+      // Show success message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Comment added successfully!'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+
+      // Reload comments to show the new one
+      await _loadComments();
+    } catch (e) {
+      print('❌ Error adding comment: $e');
+      print('Stack trace: ${StackTrace.current}');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
       }
     }
   }
@@ -208,32 +393,90 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
 
                       // comments list
                       Expanded(
-                        child: ListView.builder(
-                          controller: scrollController,
-                          itemCount: comments.length,
-                          itemBuilder: (context, index) {
-                            return ListTile(
-                              leading: CircleAvatar(
-                                backgroundColor: Theme.of(context)
-                                    .iconTheme
-                                    .color
-                                    ?.withOpacity(0.2),
-                                child: Icon(
-                                  Icons.person,
-                                  color: Theme.of(context).iconTheme.color,
+                        child: _isLoadingComments
+                            ? const Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    CircularProgressIndicator(),
+                                    SizedBox(height: 10),
+                                    Text('Loading comments...'),
+                                  ],
                                 ),
-                              ),
-                              title: Text(
-                                "user${index + 1}",
-                                style: TextStyle(color: textColor),
-                              ),
-                              subtitle: Text(
-                                comments[index],
-                                style: TextStyle(color: textColor),
-                              ),
-                            );
-                          },
-                        ),
+                              )
+                            : comments.isEmpty
+                                ? Center(
+                                    child: Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          Icons.comment_outlined,
+                                          size: 48,
+                                          color: textColor?.withOpacity(0.3),
+                                        ),
+                                        const SizedBox(height: 10),
+                                        Text(
+                                          "No comments yet. Be the first to comment!",
+                                          style: TextStyle(
+                                            color: textColor?.withOpacity(0.6),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  )
+                                : ListView.builder(
+                                    controller: scrollController,
+                                    itemCount: comments.length,
+                                    itemBuilder: (context, index) {
+                                      final comment = comments[index];
+                                      final String firstName =
+                                          comment['firstName'] ?? 'Anonymous';
+                                      final String lastName =
+                                          comment['lastName'] ?? '';
+                                      final String avatarUrl =
+                                          comment['avatarUrl'] ?? '';
+                                      final String commentText =
+                                          comment['comment'] ?? '';
+                                      final String displayName =
+                                          "$firstName $lastName".trim();
+
+                                      return ListTile(
+                                        leading: CircleAvatar(
+                                          backgroundImage: avatarUrl.isNotEmpty
+                                              ? NetworkImage(avatarUrl)
+                                              : null,
+                                          backgroundColor: avatarUrl.isEmpty
+                                              ? Theme.of(context)
+                                                  .iconTheme
+                                                  .color
+                                                  ?.withOpacity(0.2)
+                                              : null,
+                                          child: avatarUrl.isEmpty
+                                              ? Icon(
+                                                  Icons.person,
+                                                  color: Theme.of(context)
+                                                      .iconTheme
+                                                      .color,
+                                                )
+                                              : null,
+                                        ),
+                                        title: Text(
+                                          displayName.isNotEmpty
+                                              ? displayName
+                                              : "Anonymous",
+                                          style: TextStyle(
+                                            color: textColor,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                        subtitle: Text(
+                                          commentText,
+                                          style: TextStyle(color: textColor),
+                                        ),
+                                      );
+                                    },
+                                  ),
                       ),
 
                       // input
@@ -274,15 +517,21 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
                               IconButton(
                                 icon: const Icon(Icons.send,
                                     color: Colors.black54),
-                                onPressed: () {
+                                onPressed: () async {
                                   if (_dialogCommentController
                                       .text.isNotEmpty) {
-                                    setState(() {
-                                      comments.insert(
-                                          0, _dialogCommentController.text);
-                                    });
-                                    setModalState(() {});
+                                    final commentText =
+                                        _dialogCommentController.text;
                                     _dialogCommentController.clear();
+
+                                    // Close keyboard
+                                    FocusScope.of(context).unfocus();
+
+                                    // Add comment to Firestore
+                                    await _addComment(commentText);
+
+                                    // Update modal state
+                                    setModalState(() {});
                                   }
                                 },
                               ),
@@ -461,19 +710,73 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
 
             // comments trigger
             GestureDetector(
-              onTap: () => _openComments(context),
+              onTap: () {
+                if (widget.videoId.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                          '⚠️ Error: Video ID is missing. Comments cannot be loaded.'),
+                      backgroundColor: Colors.red,
+                      duration: Duration(seconds: 3),
+                    ),
+                  );
+                  return;
+                }
+                _openComments(context);
+              },
               child: Container(
                 height: 50,
                 width: MediaQuery.of(context).size.width * 0.97,
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 alignment: Alignment.centerLeft,
                 decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey),
+                  border: Border.all(
+                    color: widget.videoId.isEmpty ? Colors.red : Colors.grey,
+                    width: widget.videoId.isEmpty ? 2 : 1,
+                  ),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Text(
-                  "Comments...",
-                  style: TextStyle(color: Theme.of(context).hintColor),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        if (widget.videoId.isEmpty)
+                          const Padding(
+                            padding: EdgeInsets.only(right: 8),
+                            child: Icon(Icons.warning,
+                                color: Colors.red, size: 20),
+                          ),
+                        Text(
+                          widget.videoId.isEmpty
+                              ? "Comments (Video ID missing)"
+                              : "Comments...",
+                          style: TextStyle(
+                            color: widget.videoId.isEmpty
+                                ? Colors.red
+                                : Theme.of(context).hintColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (comments.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.green,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          '${comments.length}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
             ),
