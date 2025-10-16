@@ -1,3 +1,4 @@
+import 'package:camera/camera.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
@@ -11,8 +12,14 @@ import 'package:rexplore/viewmodel/yt_videoview_model.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'firebase_options.dart';
 
+List<CameraDescription> cameras = [];
+
+/// Main entry point for the application
+/// Initializes Firebase, Supabase, and camera access before running the app.
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  cameras = await availableCameras();
 
   // Initialize Supabase and Firebase
   await Supabase.initialize(

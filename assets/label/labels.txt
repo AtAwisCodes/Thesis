@@ -1,0 +1,4 @@
+Cardboard
+Plastic
+Cloth
+Glass

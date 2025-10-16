@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
+import 'package:rexplore/image_recognition/SimpleYOLOCamera.dart';
 import 'package:rexplore/pages/favorite_page.dart';
 import 'package:rexplore/pages/notif_page.dart';
 import 'package:rexplore/pages/profile_page.dart';
@@ -12,7 +13,6 @@ import 'package:rexplore/pages/upload_page.dart';
 import 'package:rexplore/pages/videos_page.dart';
 import 'package:rexplore/pages/search_bar.dart';
 import 'package:rexplore/services/ThemeProvider.dart';
-import 'package:rexplore/image_recognition/cam_func.dart';
 import 'package:rexplore/viewmodel/yt_videoview_model.dart';
 
 class HomePage extends StatefulWidget {
@@ -219,7 +219,8 @@ class _HomePageState extends State<HomePage> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => cameraFunc(camera: cameras[0]),
+                        builder: (context) =>
+                            SimpleYOLOCamera(camera: cameras[0]),
                       ),
                     );
                   } else {

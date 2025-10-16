@@ -45,6 +45,7 @@ class VideoUploadService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final Uuid _uuid = const Uuid();
 
+  //DITO MO LAGAY IP MO LANS YESHUA DE GUZMAN
   static const String _backendUrl = 'http://192.168.100.25:5000';
 
   //Upload multiple model images to Supabase bucket "ar_pics"

@@ -94,6 +94,8 @@ flutter:
     - lib/icons/Loading.gif
     - lib/icons/Landing.png
     - lib/icons/LandPic.png
+    - assets/models/my_model.tflite
+    - assets/label/labels.txt
   #   - images/a_dot_ham.jpeg
 
   # An image asset can refer to one or more resolution-specific "variants", see

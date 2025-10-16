@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class MeshyApiService {
+  //DITO MO LAGAY IP MO LANS YESHUA DE GUZMAN
   static const String baseUrl = 'http://192.168.100.25:5000';
 
   /// Generate a 3D model from a video's modelImages

@@ -1,7 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
-import 'package:rexplore/image_recognition/cam_func.dart';
+import 'package:rexplore/image_recognition/SimpleYOLOCamera.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:rexplore/services/favorites_manager.dart';
 
@@ -213,7 +213,7 @@ class _YtVideoPlayerState extends State<YtVideoPlayer> {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => cameraFunc(camera: cameras[0]),
+            builder: (context) => SimpleYOLOCamera(camera: cameras[0]),
           ),
         );
       }
