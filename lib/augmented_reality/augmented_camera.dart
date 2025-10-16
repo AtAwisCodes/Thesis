@@ -15,7 +15,7 @@ import 'package:rexplore/services/meshy_api_service.dart';
 import 'dart:io';
 
 class MeshyARCamera extends StatefulWidget {
-  final String? videoId; // Optional: to load specific video's model
+  final String? videoId;
 
   const MeshyARCamera({super.key, this.videoId});
 

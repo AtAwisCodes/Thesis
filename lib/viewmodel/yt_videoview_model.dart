@@ -6,6 +6,7 @@ class YtVideoviewModel extends ChangeNotifier {
   List<YtVideo> playlistItems = [];
   String? nextPageToken;
   bool isLoading = false;
+  String searchQuery = '';
 
   get allVideos => null;
 
@@ -28,6 +29,16 @@ class YtVideoviewModel extends ChangeNotifier {
 
     nextPageToken = newToken;
     isLoading = false;
+    notifyListeners();
+  }
+
+  void setSearchQuery(String query) {
+    searchQuery = query;
+    notifyListeners();
+  }
+
+  void clearSearch() {
+    searchQuery = '';
     notifyListeners();
   }
 

@@ -2,8 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class MeshyApiService {
-  static const String baseUrl =
-      'http://localhost:5000'; // Change to your deployed URL
+  static const String baseUrl = 'http://192.168.100.25:5000';
 
   /// Generate a 3D model from a video's modelImages
   static Future<Map<String, dynamic>> generateModel({

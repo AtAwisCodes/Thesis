@@ -13,6 +13,7 @@ import 'package:rexplore/pages/videos_page.dart';
 import 'package:rexplore/pages/search_bar.dart';
 import 'package:rexplore/services/ThemeProvider.dart';
 import 'package:rexplore/image_recognition/cam_func.dart';
+import 'package:rexplore/viewmodel/yt_videoview_model.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -149,9 +150,62 @@ class _HomePageState extends State<HomePage> {
             )
           : null,
 
-      body: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 300),
-        child: getSelectedWidget(page: page),
+      body: Column(
+        children: [
+          // Show search filter banner when active
+          if (page == 0)
+            Consumer<YtVideoviewModel>(
+              builder: (context, ytVideoViewModel, _) {
+                if (ytVideoViewModel.searchQuery.isNotEmpty) {
+                  return Container(
+                    width: double.infinity,
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withOpacity(0.1),
+                      border: Border(
+                        bottom:
+                            BorderSide(color: Colors.green.withOpacity(0.3)),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.filter_alt,
+                            size: 18, color: Colors.green),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Filtering by: "${ytVideoViewModel.searchQuery}"',
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: Colors.green,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close,
+                              size: 18, color: Colors.green),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                          onPressed: () {
+                            ytVideoViewModel.clearSearch();
+                          },
+                        ),
+                      ],
+                    ),
+                  );
+                }
+                return const SizedBox.shrink();
+              },
+            ),
+          Expanded(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 300),
+              child: getSelectedWidget(page: page),
+            ),
+          ),
+        ],
       ),
 
       //Camera Floating Action Button AI - Only visible on home page

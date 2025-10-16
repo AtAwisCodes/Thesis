@@ -567,43 +567,26 @@ class _CustomDialogWidgetState extends State<CustomDialogWidget> {
     });
 
     try {
-      final userId = FirebaseAuth.instance.currentUser!.uid;
-
-      //Step 1: Upload model images first
+      // Convert XFile images to File objects
       final imageFiles = _selectedImages.map((x) => File(x.path)).toList();
-      final imageUrls = await _uploadService.uploadModelImages(
-        imageFiles: imageFiles,
-        userId: userId,
-        onProgress: (progress, status) {
-          setState(() {
-            _uploadProgress = progress * 0.4; // first 40% for images
-            _uploadStatus = status;
-          });
-        },
-      );
 
-      //Step 2: Upload video next
+      // Upload everything in one call - service handles images, video, and 3D generation
       final result = await _uploadService.uploadVideoWithProgress(
         videoPath: _videoPath!,
         title: _titleController.text.trim(),
         description: _descriptionController.text.trim(),
-        modelImages: null,
+        modelImages: imageFiles, // ✅ Pass the image files
         onProgress: (progress, status) {
           setState(() {
-            _uploadProgress = 0.4 + (progress * 0.6);
+            _uploadProgress = progress;
             _uploadStatus = status;
           });
         },
       );
 
-      //Step 3: If video upload succeeded, attach image metadata to Firestore
       if (result.success) {
-        await FirebaseFirestore.instance
-            .collection('videos')
-            .doc(result.videoId)
-            .update({'modelImages': imageUrls});
-
-        _showSuccess("Upload successful!");
+        _showSuccess(
+            "Upload successful! 3D model generation started in background.");
         Navigator.of(context).pop();
       } else {
         _showError(result.error ?? "Upload failed");

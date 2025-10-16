@@ -9,6 +9,7 @@ import 'package:rexplore/theme.dart/darkTheme.dart';
 import 'package:rexplore/theme.dart/lightTheme.dart';
 import 'package:rexplore/viewmodel/yt_videoview_model.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -20,7 +21,10 @@ void main() async {
         'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InluanFjYXh4b2Z0ZXFmYmNuYnB5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ5OTUzNDEsImV4cCI6MjA3MDU3MTM0MX0.mSqnKhqSmrICZ5B2iCDcQgeOLF3xCgC1MnMnF1FbzMM',
   );
 
-  await Firebase.initializeApp();
+  //ADD FIREBASE OPTIONS
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   GetIt.instance.registerSingleton<FirebaseService>(FirebaseService());
   runApp(
     MultiProvider(

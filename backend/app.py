@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify, Response
 from flask_cors import CORS
 import requests
 from google.cloud import firestore
+from google.oauth2 import service_account
 from supabase import create_client, Client
 import tempfile
 import os
@@ -15,8 +16,31 @@ MESHY_API_KEY = "msy_zkhom6uoX6vtWwvnrtsOB5PT01yO049AIXRX"
 SUPABASE_URL = "https://ynjqcaxxofteqfbcnbpy.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InluanFjYXh4b2Z0ZXFmYmNuYnB5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ5OTUzNDEsImV4cCI6MjA3MDU3MTM0MX0.mSqnKhqSmrICZ5B2iCDcQgeOLF3xCgC1MnMnF1FbzMM"
 
+# Path to your Firebase service account key JSON file
+FIREBASE_CREDENTIALS_PATH = os.path.join(os.path.dirname(__file__), 'firebase-credentials.json')
+
 # --- INITIALIZE CLIENTS ---
-db = firestore.Client()
+try:
+    if os.path.exists(FIREBASE_CREDENTIALS_PATH):
+        # Use service account credentials
+        credentials = service_account.Credentials.from_service_account_file(FIREBASE_CREDENTIALS_PATH)
+        db = firestore.Client(credentials=credentials)
+        print("✅ Firestore initialized with service account credentials")
+    else:
+        print("⚠️ WARNING: firebase-credentials.json not found!")
+        print(f"   Expected location: {FIREBASE_CREDENTIALS_PATH}")
+        print("   Attempting to use Application Default Credentials...")
+        db = firestore.Client()
+except Exception as e:
+    print(f"❌ ERROR: Failed to initialize Firestore: {e}")
+    print("\n🔧 To fix this, do ONE of the following:")
+    print("   1. Download your Firebase service account JSON from:")
+    print("      Firebase Console → Project Settings → Service Accounts → Generate New Private Key")
+    print(f"   2. Save it as: {FIREBASE_CREDENTIALS_PATH}")
+    print("   3. OR set GOOGLE_APPLICATION_CREDENTIALS environment variable")
+    print("\nServer will continue but Firestore operations will fail.\n")
+    db = None
+
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # --- HELPER FUNCTIONS ---
@@ -38,6 +62,9 @@ def generate_3d_model():
     Expects JSON: { "video_id": "...", "user_id": "..." }
     """
     try:
+        if db is None:
+            return jsonify({"error": "Firestore not initialized - check server logs"}), 503
+            
         data = request.json
         video_id = data.get('video_id')
         user_id = data.get('user_id')
@@ -121,11 +148,17 @@ def check_model_status(task_id):
         
         model_info = response.json()
         status = model_info.get("status")
+        progress = model_info.get("progress", 0)
+        
+        # Normalize status to lowercase for consistency
+        status_normalized = status.lower() if status else "unknown"
+        
+        print(f"Task {task_id}: {status_normalized} ({progress}%)")
 
         return jsonify({
             "task_id": task_id,
-            "status": status,
-            "progress": model_info.get("progress", 0),
+            "status": status_normalized,
+            "progress": progress,
             "model_info": model_info
         }), 200
 

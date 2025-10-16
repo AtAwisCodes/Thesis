@@ -44,7 +44,8 @@ class VideoUploadService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final Uuid _uuid = const Uuid();
-  static const String _backendUrl = 'msy_zkhom6uoX6vtWwvnrtsOB5PT01yO049AIXRX';
+
+  static const String _backendUrl = 'http://192.168.100.25:5000';
 
   //Upload multiple model images to Supabase bucket "ar_pics"
   Future<List<String>> uploadModelImages({
@@ -100,23 +101,38 @@ class VideoUploadService {
       onStatusUpdate('Requesting 3D model generation...');
 
       // Step 1: Call backend to generate 3D model
-      final response = await http.post(
+      final response = await http
+          .post(
         Uri.parse('$_backendUrl/api/generate-3d'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'video_id': videoId,
           'user_id': user.uid,
         }),
+      )
+          .timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          throw Exception(
+              'Backend connection timeout. Is the backend running at $_backendUrl?');
+        },
       );
 
       if (response.statusCode != 200) {
-        throw Exception('Failed to generate 3D model: ${response.body}');
+        final errorBody = response.body;
+        print('Backend error (${response.statusCode}): $errorBody');
+        throw Exception('Failed to generate 3D model: $errorBody');
       }
 
       final data = jsonDecode(response.body);
       final taskId = data['task_id'];
 
+      if (taskId == null || taskId.isEmpty) {
+        throw Exception('Backend returned empty task_id');
+      }
+
       onStatusUpdate('3D model generation started (Task: $taskId)');
+      print('3D generation task created: $taskId');
 
       // Step 2: Poll for completion (you can also use SSE for real-time updates)
       return await _pollModelCompletion(
@@ -124,9 +140,16 @@ class VideoUploadService {
         userId: user.uid,
         onStatusUpdate: onStatusUpdate,
       );
+    } on http.ClientException catch (e) {
+      final errorMsg =
+          'Cannot connect to backend at $_backendUrl. Is it running? Error: $e';
+      print('$errorMsg');
+      onStatusUpdate(errorMsg);
+      return null;
     } catch (e) {
-      print('Error generating 3D model: $e');
-      onStatusUpdate('Error: $e');
+      final errorMsg = 'Error generating 3D model: $e';
+      print('$errorMsg');
+      onStatusUpdate(errorMsg);
       return null;
     }
   }
@@ -137,16 +160,29 @@ class VideoUploadService {
     required String userId,
     required Function(String status) onStatusUpdate,
   }) async {
-    try {
-      int attempts = 0;
-      const maxAttempts = 60; // 5 minutes max (5s intervals)
+    int attempts = 0;
+    const maxAttempts =
+        120; // 10 minutes max (5s intervals) - Meshy can be slow
 
+    print(
+        'Starting polling for task: $taskId (max ${maxAttempts * 5} seconds)');
+
+    try {
       while (attempts < maxAttempts) {
         await Future.delayed(const Duration(seconds: 5));
 
         // Check status from backend
-        final statusResponse = await http.get(
+        print('Polling attempt ${attempts + 1}/$maxAttempts for task: $taskId');
+        final statusResponse = await http
+            .get(
           Uri.parse('$_backendUrl/api/model-status/$taskId'),
+        )
+            .timeout(
+          const Duration(seconds: 10),
+          onTimeout: () {
+            print('Status check timed out, will retry...');
+            throw Exception('Status check timeout');
+          },
         );
 
         if (statusResponse.statusCode == 200) {
@@ -154,9 +190,13 @@ class VideoUploadService {
           final status = statusData['status'];
           final progress = statusData['progress'] ?? 0;
 
+          print('Status received: "$status" | Progress: $progress%');
           onStatusUpdate('Model generation: $status ($progress%)');
 
-          if (status == 'succeeded') {
+          // Check status case-insensitively (Meshy returns UPPERCASE)
+          final statusLower = status?.toString().toLowerCase();
+
+          if (statusLower == 'succeeded') {
             // Model is ready, fetch it
             onStatusUpdate('Fetching completed model...');
             return await _fetchCompletedModel(
@@ -164,16 +204,31 @@ class VideoUploadService {
               userId: userId,
               onStatusUpdate: onStatusUpdate,
             );
-          } else if (status == 'failed' || status == 'canceled') {
+          } else if (statusLower == 'failed' || statusLower == 'canceled') {
             throw Exception('Model generation $status');
           }
+        } else {
+          print('Status check failed with code: ${statusResponse.statusCode}');
+          print('Response: ${statusResponse.body}');
         }
 
         attempts++;
       }
 
-      throw Exception('Model generation timed out');
+      final timeoutMsg =
+          'Model generation timed out after ${maxAttempts * 5} seconds';
+      print(timeoutMsg);
+      throw Exception(timeoutMsg);
+    } on http.ClientException catch (e) {
+      // Network error - don't fail immediately, let it retry
+      print('Network error during polling (attempt $attempts): $e');
+      return null;
     } catch (e) {
+      // Only fail on non-timeout errors
+      if (e.toString().contains('Status check timeout')) {
+        print('Temporary timeout, continuing polling...');
+        return null;
+      }
       print('Error polling model: $e');
       onStatusUpdate('Error: $e');
       return null;
@@ -347,13 +402,33 @@ class VideoUploadService {
       if (modelImageUrls.isNotEmpty && modelImageUrls.length >= 3) {
         onProgress(0.95, 'Initiating 3D model generation...');
 
-        // Generate 3D model asynchronously (don't wait for completion)
-        _generate3DModelAsync(
-          videoId: docRef.id,
-          onStatusUpdate: (status) {
-            print('3D Model Status: $status');
-          },
-        );
+        // Check backend health before attempting generation
+        final backendHealthy = await isBackendHealthy();
+
+        if (!backendHealthy) {
+          print('⚠️ Backend not available - skipping 3D generation for now');
+          await _firestore.collection('videos').doc(docRef.id).update({
+            'modelGenerationPending': true,
+            'modelGenerationError': 'Backend unavailable at upload time',
+          });
+        } else {
+          // Small delay to ensure Firestore write is propagated
+          await Future.delayed(const Duration(milliseconds: 500));
+
+          // Generate 3D model asynchronously (don't wait for completion)
+          _generate3DModelAsync(
+            videoId: docRef.id,
+            onStatusUpdate: (status) {
+              print('3D Model Status: $status');
+            },
+          );
+
+          print(
+              '3D model generation queued for video: ${docRef.id} with ${modelImageUrls.length} images');
+        }
+      } else {
+        print(
+            'Skipping 3D generation: Only ${modelImageUrls.length} images (need 3+)');
       }
 
       onProgress(1.0, 'All done!');
@@ -374,12 +449,18 @@ class VideoUploadService {
     required Function(String status) onStatusUpdate,
   }) async {
     try {
+      print('Starting async 3D generation for video: $videoId');
+
       final modelData = await generate3DModelFromImages(
         videoId: videoId,
         onStatusUpdate: onStatusUpdate,
       );
 
       if (modelData != null) {
+        print('3D model generated successfully!');
+        print('Model URL: ${modelData['model_public_url']}');
+        print('Firestore Doc: ${modelData['firestore_doc_id']}');
+
         // Update Firestore with generated model info
         await _firestore.collection('videos').doc(videoId).update({
           'has3DModel': true,
@@ -389,10 +470,33 @@ class VideoUploadService {
         });
 
         onStatusUpdate('3D model generated and saved!');
+        print('Firestore updated with 3D model info');
+      } else {
+        print('3D generation returned null - check backend logs');
+        onStatusUpdate('3D model generation failed - check backend');
+
+        // Update status in Firestore
+        await _firestore.collection('videos').doc(videoId).update({
+          'has3DModel': false,
+          'modelGenerationError': 'Generation returned null',
+          'modelGenerationAttemptedAt': FieldValue.serverTimestamp(),
+        });
       }
     } catch (e) {
-      print('Error in async 3D model generation: $e');
+      final errorMsg = 'Error in async 3D model generation: $e';
+      print('$errorMsg');
       onStatusUpdate('Failed to generate 3D model: $e');
+
+      // Log error to Firestore for debugging
+      try {
+        await _firestore.collection('videos').doc(videoId).update({
+          'has3DModel': false,
+          'modelGenerationError': e.toString(),
+          'modelGenerationAttemptedAt': FieldValue.serverTimestamp(),
+        });
+      } catch (firestoreError) {
+        print('Could not update Firestore with error: $firestoreError');
+      }
     }
   }
 
@@ -423,6 +527,53 @@ class VideoUploadService {
     } catch (e) {
       print('Error checking model status: $e');
       return false;
+    }
+  }
+
+  //Check if backend is healthy and accessible
+  Future<bool> isBackendHealthy() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$_backendUrl/api/health'),
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(
+        const Duration(seconds: 5),
+        onTimeout: () {
+          throw Exception('Backend health check timeout');
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['status'] == 'healthy';
+      }
+      return false;
+    } catch (e) {
+      print('Backend health check failed: $e');
+      return false;
+    }
+  }
+
+  //Get video model status with details
+  Future<Map<String, dynamic>> getModelStatus(String videoId) async {
+    try {
+      final doc = await _firestore.collection('videos').doc(videoId).get();
+      if (!doc.exists) {
+        return {'exists': false};
+      }
+
+      final data = doc.data()!;
+      return {
+        'exists': true,
+        'has3DModel': data['has3DModel'] ?? false,
+        'generatedModelUrl': data['generatedModelUrl'],
+        'modelGenerationError': data['modelGenerationError'],
+        'modelGenerationAttemptedAt': data['modelGenerationAttemptedAt'],
+        'modelGeneratedAt': data['modelGeneratedAt'],
+      };
+    } catch (e) {
+      print('Error getting model status: $e');
+      return {'exists': false, 'error': e.toString()};
     }
   }
 
