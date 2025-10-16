@@ -20,6 +20,7 @@ class MeshyARCamera extends StatefulWidget {
   const MeshyARCamera({super.key, this.videoId});
 
   @override
+  // ignore: library_private_types_in_public_api
   _MeshyARCameraState createState() => _MeshyARCameraState();
 }
 

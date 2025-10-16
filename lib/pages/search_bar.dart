@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:rexplore/viewmodel/yt_videoview_model.dart';
@@ -12,7 +11,6 @@ class Search extends StatefulWidget {
 
 // SearchBar Class
 class MySearchDelegate extends SearchDelegate {
-  Timer? _debounceTimer;
   @override
   String get searchFieldLabel => 'Search videos...';
 
@@ -42,35 +40,21 @@ class MySearchDelegate extends SearchDelegate {
   Widget? buildLeading(BuildContext context) => IconButton(
         icon: const Icon(Icons.arrow_back),
         onPressed: () {
-          // If there's a query, keep it; if not, clear search
-          if (query.trim().isNotEmpty) {
-            Provider.of<YtVideoviewModel>(context, listen: false)
-                .setSearchQuery(query.trim());
-            print('DEBUG: Back button pressed with query: "${query.trim()}"');
-          } else {
+          // Only clear if user presses back with empty query (canceling search)
+          // If there's a query, it means they want to keep it
+          if (query.isEmpty) {
             Provider.of<YtVideoviewModel>(context, listen: false).clearSearch();
-            print('DEBUG: Back button pressed, search cleared');
+            print(
+                'DEBUG: Back button pressed with empty query, cleared search');
+          } else {
+            print('DEBUG: Back button pressed with query, keeping it');
           }
-          close(context, query);
+          close(context, null);
         },
       );
 
   @override
   List<Widget>? buildActions(BuildContext context) => [
-        if (query.isNotEmpty)
-          IconButton(
-            icon: const Icon(Icons.search),
-            onPressed: () {
-              // Set query and close to show results
-              if (query.trim().isNotEmpty) {
-                Provider.of<YtVideoviewModel>(context, listen: false)
-                    .setSearchQuery(query.trim());
-                print(
-                    'DEBUG: Search button pressed, query set: "${query.trim()}"');
-              }
-              close(context, query);
-            },
-          ),
         if (query.isNotEmpty)
           IconButton(
             icon: const Icon(Icons.clear),
@@ -87,34 +71,28 @@ class MySearchDelegate extends SearchDelegate {
   Widget buildResults(BuildContext context) {
     // CRITICAL: Set the search query BEFORE closing
     if (query.trim().isNotEmpty) {
-      Provider.of<YtVideoviewModel>(context, listen: false)
-          .setSearchQuery(query.trim());
-      print('DEBUG: Setting search query in buildResults: "${query.trim()}"');
+      final trimmedQuery = query.trim();
+      print('DEBUG: buildResults called with query: "$trimmedQuery"');
+
+      final viewModel = Provider.of<YtVideoviewModel>(context, listen: false);
+      viewModel.setSearchQuery(trimmedQuery);
+
+      print(
+          'DEBUG: After setSearchQuery, viewModel.searchQuery = "${viewModel.searchQuery}"');
+
+      // Small delay to ensure state is updated before closing
+      Future.microtask(() {
+        print('DEBUG: Closing search interface');
+        close(context, query);
+      });
+    } else {
+      close(context, query);
     }
-    close(context, query);
     return Container();
-  }
-
-  void _updateSearchQuery(BuildContext context, String searchQuery) {
-    _debounceTimer?.cancel();
-
-    // Only update the search query for real-time filtering, don't auto-close
-    _debounceTimer = Timer(const Duration(milliseconds: 300), () {
-      if (searchQuery.trim().isNotEmpty) {
-        Provider.of<YtVideoviewModel>(context, listen: false)
-            .setSearchQuery(searchQuery.trim());
-        print('DEBUG: Real-time search query updated: "${searchQuery.trim()}"');
-      } else {
-        Provider.of<YtVideoviewModel>(context, listen: false).clearSearch();
-        print('DEBUG: Search query cleared');
-      }
-    });
   }
 
   @override
   Widget buildSuggestions(BuildContext context) {
-    _updateSearchQuery(context, query);
-
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(20.0),
@@ -122,7 +100,7 @@ class MySearchDelegate extends SearchDelegate {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              query.isEmpty ? Icons.search : Icons.filter_list,
+              query.isEmpty ? Icons.search : Icons.keyboard,
               size: 64,
               color: Colors.green.withOpacity(0.6),
             ),
@@ -130,7 +108,7 @@ class MySearchDelegate extends SearchDelegate {
             Text(
               query.isEmpty
                   ? "Type to search for videos"
-                  : "Searching for '$query'...",
+                  : "Press Enter to search for '$query'",
               style: TextStyle(
                 fontSize: 18,
                 color: Colors.grey[700],
@@ -142,31 +120,11 @@ class MySearchDelegate extends SearchDelegate {
             Text(
               query.isEmpty
                   ? "Search by title, description, or channel name"
-                  : "Results will show automatically",
+                  : "Tap the Enter key on your keyboard",
               style: TextStyle(fontSize: 14, color: Colors.grey[500]),
               textAlign: TextAlign.center,
             ),
-            if (query.isNotEmpty) ...[
-              const SizedBox(height: 20),
-              SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(
-                      Colors.green.withOpacity(0.6)),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                "Results will appear automatically...",
-                style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[400],
-                    fontStyle: FontStyle.italic),
-                textAlign: TextAlign.center,
-              ),
-            ],
+            if (query.isNotEmpty) ...[],
           ],
         ),
       ),

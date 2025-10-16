@@ -34,11 +34,15 @@ class YtVideoviewModel extends ChangeNotifier {
 
   void setSearchQuery(String query) {
     searchQuery = query;
+    print(
+        'DEBUG YtVideoviewModel.setSearchQuery: searchQuery is now "$searchQuery"');
     notifyListeners();
+    print('DEBUG YtVideoviewModel.setSearchQuery: notifyListeners() called');
   }
 
   void clearSearch() {
     searchQuery = '';
+    print('DEBUG YtVideoviewModel.clearSearch: searchQuery cleared');
     notifyListeners();
   }
 
