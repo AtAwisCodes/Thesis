@@ -57,6 +57,7 @@ class _CustomDialogWidgetState extends State<CustomDialogWidget> {
   final TextEditingController _descriptionController = TextEditingController();
   final ImagePicker _picker = ImagePicker();
   final List<XFile> _selectedImages = [];
+  XFile? _thumbnailImage;
 
   final VideoUploadService _uploadService = VideoUploadService();
   Map<String, dynamic>? _userData;
@@ -87,6 +88,20 @@ class _CustomDialogWidgetState extends State<CustomDialogWidget> {
     _titleController.dispose();
     _descriptionController.dispose();
     super.dispose();
+  }
+
+  //Thumbnail picker - single image only
+  Future<void> _pickThumbnail() async {
+    try {
+      final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+      if (image != null) {
+        setState(() {
+          _thumbnailImage = image;
+        });
+      }
+    } catch (e) {
+      _showError("Error picking thumbnail: $e");
+    }
   }
 
   //Image picker with limit validation
@@ -398,6 +413,89 @@ class _CustomDialogWidgetState extends State<CustomDialogWidget> {
 
                 SizedBox(height: screenHeight * 0.015),
 
+                //Thumbnail Section
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  children: [
+                    Text(
+                      "Thumbnail",
+                      style: theme.textTheme.titleMedium
+                          ?.copyWith(fontWeight: FontWeight.bold, fontSize: 18),
+                    ),
+                  ],
+                ),
+                SizedBox(height: screenHeight * 0.01),
+                GestureDetector(
+                  onTap: _isUploading ? null : _pickThumbnail,
+                  child: Container(
+                    height: 120,
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surface,
+                      border: Border.all(
+                        color: theme.dividerColor,
+                        width: 2,
+                        style: BorderStyle.solid,
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: _thumbnailImage != null
+                        ? Stack(
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(10),
+                                child: Image.file(
+                                  File(_thumbnailImage!.path),
+                                  width: double.infinity,
+                                  height: 120,
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                              Positioned(
+                                right: 8,
+                                top: 8,
+                                child: GestureDetector(
+                                  onTap: () {
+                                    setState(() {
+                                      _thumbnailImage = null;
+                                    });
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.all(4),
+                                    decoration: const BoxDecoration(
+                                      color: Colors.black54,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(Icons.close,
+                                        color: Colors.white, size: 20),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          )
+                        : Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.add_photo_alternate_outlined,
+                                size: 40,
+                                color: theme.colorScheme.primary,
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                "Select Thumbnail Image",
+                                style: TextStyle(
+                                  color: theme.hintColor,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
+                          ),
+                  ),
+                ),
+
+                SizedBox(height: screenHeight * 0.02),
+
                 //Model Images Section
                 Row(
                   mainAxisAlignment: MainAxisAlignment.start,
@@ -555,6 +653,11 @@ class _CustomDialogWidgetState extends State<CustomDialogWidget> {
       return;
     }
 
+    if (_thumbnailImage == null) {
+      _showError("Please select a thumbnail image");
+      return;
+    }
+
     if (_selectedImages.length < 3) {
       _showError("Please select at least 3 images before uploading.");
       return;
@@ -569,13 +672,16 @@ class _CustomDialogWidgetState extends State<CustomDialogWidget> {
     try {
       // Convert XFile images to File objects
       final imageFiles = _selectedImages.map((x) => File(x.path)).toList();
+      final thumbnailFile =
+          _thumbnailImage != null ? File(_thumbnailImage!.path) : null;
 
-      // Upload everything in one call - service handles images, video, and 3D generation
+      // Upload everything in one call - service handles images, video, thumbnail, and 3D generation
       final result = await _uploadService.uploadVideoWithProgress(
         videoPath: _videoPath!,
         title: _titleController.text.trim(),
         description: _descriptionController.text.trim(),
         modelImages: imageFiles, // ✅ Pass the image files
+        thumbnailImage: thumbnailFile, // ✅ Pass the thumbnail image
         onProgress: (progress, status) {
           setState(() {
             _uploadProgress = progress;

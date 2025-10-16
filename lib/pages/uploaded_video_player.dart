@@ -46,6 +46,7 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
   bool _isCheckingModel = true;
   String? _modelError;
   bool _isLoadingComments = true;
+  int _viewCount = 0;
 
   @override
   void initState() {
@@ -69,11 +70,49 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
     // Load initial liked state
     isLiked = FavoritesManager.instance.contains(widget.videoUrl);
 
+    // Increment view count when video is opened
+    _incrementViewCount();
+
     // Check 3D model status
     _check3DModelStatus();
 
     // Load comments
     _loadComments();
+  }
+
+  // Increment view count in Firestore
+  Future<void> _incrementViewCount() async {
+    if (widget.videoId.isEmpty) {
+      print('Cannot increment views: Video ID is empty');
+      return;
+    }
+
+    try {
+      print('Incrementing view count for video: ${widget.videoId}');
+      await _uploadService.incrementViews(widget.videoId);
+      print('View count incremented successfully');
+
+      // Fetch updated view count
+      await _fetchViewCount();
+    } catch (e) {
+      print('Error incrementing view count: $e');
+    }
+  }
+
+  // Fetch current view count from Firestore
+  Future<void> _fetchViewCount() async {
+    if (widget.videoId.isEmpty) return;
+
+    try {
+      final analytics = await _uploadService.getVideoAnalytics(widget.videoId);
+      if (mounted) {
+        setState(() {
+          _viewCount = analytics['views'] ?? 0;
+        });
+      }
+    } catch (e) {
+      print('Error fetching view count: $e');
+    }
   }
 
   Future<void> _check3DModelStatus() async {
@@ -126,8 +165,8 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
     }
 
     try {
-      print('📝 Loading comments for video: ${widget.videoId}');
-      print('📍 Path: videos/${widget.videoId}/comments');
+      print('Loading comments for video: ${widget.videoId}');
+      print('Path: videos/${widget.videoId}/comments');
 
       final snapshot = await _firestore
           .collection('videos')
@@ -136,7 +175,7 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
           .orderBy('timestamp', descending: true)
           .get();
 
-      print('✅ Found ${snapshot.docs.length} comments');
+      print('Found ${snapshot.docs.length} comments');
 
       if (mounted) {
         setState(() {
@@ -144,7 +183,7 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
           for (var doc in snapshot.docs) {
             final data = doc.data();
             print(
-                '💬 Comment: ${data['comment']} by ${data['firstName']} ${data['lastName']}');
+                'Comment: ${data['comment']} by ${data['firstName']} ${data['lastName']}');
             comments.add({
               'id': doc.id,
               ...data,
@@ -154,17 +193,17 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
         });
       }
     } catch (e) {
-      print('⚠️ Error loading comments with ordering: $e');
+      print('Error loading comments with ordering: $e');
       // If ordering fails, try without ordering
       try {
-        print('🔄 Retrying without ordering...');
+        print('Retrying without ordering...');
         final snapshot = await _firestore
             .collection('videos')
             .doc(widget.videoId)
             .collection('comments')
             .get();
 
-        print('✅ Loaded ${snapshot.docs.length} comments without ordering');
+        print('Loaded ${snapshot.docs.length} comments without ordering');
 
         if (mounted) {
           setState(() {
@@ -179,7 +218,7 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
           });
         }
       } catch (e2) {
-        print('❌ Error loading comments without ordering: $e2');
+        print('Error loading comments without ordering: $e2');
         if (mounted) {
           setState(() {
             _isLoadingComments = false;
@@ -192,11 +231,11 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
   // Add a new comment to Firestore
   Future<void> _addComment(String commentText) async {
     if (widget.videoId.isEmpty) {
-      print('❌ Cannot add comment: Video ID is empty');
+      print('Cannot add comment');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Error: Video ID is missing. Cannot add comment.'),
+            content: Text('Error'),
             backgroundColor: Colors.red,
           ),
         );
@@ -207,7 +246,7 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
     try {
       final user = _auth.currentUser;
       if (user == null) {
-        print('❌ User not logged in');
+        print('User not logged in');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Please login to comment')),
@@ -216,18 +255,18 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
         return;
       }
 
-      print('📤 Adding comment for user: ${user.uid}');
-      print('📍 Video ID: ${widget.videoId}');
+      print('Adding comment for user: ${user.uid}');
+      print('Video ID: ${widget.videoId}');
 
       // Get user info from Firestore
       final userDoc = await _firestore.collection('count').doc(user.uid).get();
 
       if (!userDoc.exists) {
-        print('⚠️ User document not found in Firestore');
+        print('User document not found in Firestore');
       }
 
       final userData = userDoc.data();
-      print('👤 User data: $userData');
+      print('User data: $userData');
 
       final String firstName = userData?['first_name'] ?? 'Anonymous';
       final String lastName = userData?['last_name'] ?? '';
@@ -243,8 +282,8 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
         'timestamp': FieldValue.serverTimestamp(),
       };
 
-      print('💾 Saving comment to: videos/${widget.videoId}/comments');
-      print('📝 Comment data: $commentData');
+      print('Saving comment to: videos/${widget.videoId}/comments');
+      print('Comment data: $commentData');
 
       final docRef = await _firestore
           .collection('videos')
@@ -252,13 +291,13 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
           .collection('comments')
           .add(commentData);
 
-      print('✅ Comment added with ID: ${docRef.id}');
+      print('Comment added with ID: ${docRef.id}');
 
       // Show success message
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('✅ Comment added successfully!'),
+            content: Text('Comment added successfully!'),
             backgroundColor: Colors.green,
             duration: Duration(seconds: 2),
           ),
@@ -268,7 +307,7 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
       // Reload comments to show the new one
       await _loadComments();
     } catch (e) {
-      print('❌ Error adding comment: $e');
+      print('Error adding comment: $e');
       print('Stack trace: ${StackTrace.current}');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -282,6 +321,98 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
     }
   }
 
+  // Delete a comment from Firestore
+  Future<void> _deleteComment(String commentId, String commentUserId) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) {
+        print('User not logged in');
+        return;
+      }
+
+      // Check if the current user owns this comment
+      if (user.uid != commentUserId) {
+        print('User ${user.uid} cannot delete comment owned by $commentUserId');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('You can only delete your own comments'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
+      }
+
+      print('Deleting comment: $commentId');
+      print('Path: videos/${widget.videoId}/comments/$commentId');
+
+      await _firestore
+          .collection('videos')
+          .doc(widget.videoId)
+          .collection('comments')
+          .doc(commentId)
+          .delete();
+
+      print('Comment deleted successfully');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Comment deleted'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+
+      // Reload comments
+      await _loadComments();
+    } catch (e) {
+      print('Error deleting comment: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error deleting comment: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  // Show delete confirmation dialog
+  Future<void> _confirmDeleteComment(
+      String commentId, String commentUserId) async {
+    final user = _auth.currentUser;
+    if (user == null || user.uid != commentUserId) {
+      return;
+    }
+
+    final shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Comment'),
+        content: const Text('Are you sure you want to delete this comment?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldDelete == true) {
+      await _deleteComment(commentId, commentUserId);
+    }
+  }
+
   @override
   void dispose() {
     _controller.dispose();
@@ -289,7 +420,7 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
     super.dispose();
   }
 
-  // ✅ Updated to use Meshy AR Camera with videoId
+  //Updated to use Meshy AR Camera with videoId
   Future<void> _openARCamera() async {
     if (mounted) {
       Navigator.push(
@@ -430,6 +561,10 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
                                     itemCount: comments.length,
                                     itemBuilder: (context, index) {
                                       final comment = comments[index];
+                                      final String commentId =
+                                          comment['id'] ?? '';
+                                      final String commentUserId =
+                                          comment['userId'] ?? '';
                                       final String firstName =
                                           comment['firstName'] ?? 'Anonymous';
                                       final String lastName =
@@ -440,6 +575,12 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
                                           comment['comment'] ?? '';
                                       final String displayName =
                                           "$firstName $lastName".trim();
+
+                                      // Check if current user owns this comment
+                                      final currentUser = _auth.currentUser;
+                                      final isOwnComment =
+                                          currentUser != null &&
+                                              currentUser.uid == commentUserId;
 
                                       return ListTile(
                                         leading: CircleAvatar(
@@ -474,6 +615,22 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
                                           commentText,
                                           style: TextStyle(color: textColor),
                                         ),
+                                        trailing: isOwnComment
+                                            ? IconButton(
+                                                icon: const Icon(
+                                                  Icons.delete_outline,
+                                                  color: Colors.red,
+                                                  size: 20,
+                                                ),
+                                                onPressed: () {
+                                                  _confirmDeleteComment(
+                                                    commentId,
+                                                    commentUserId,
+                                                  );
+                                                },
+                                                tooltip: 'Delete comment',
+                                              )
+                                            : null,
                                       );
                                     },
                                   ),
@@ -610,15 +767,32 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
             // Title
             Padding(
               padding: const EdgeInsets.all(12.0),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  widget.title,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.title,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 8),
+                  // View counts
+                  Row(
+                    children: [
+                      const SizedBox(width: 6),
+                      Text(
+                        '$_viewCount ${_viewCount == 1 ? 'view' : 'views'}',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
 
@@ -714,8 +888,7 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
                 if (widget.videoId.isEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text(
-                          '⚠️ Error: Video ID is missing. Comments cannot be loaded.'),
+                      content: Text('Comments cannot be loaded.'),
                       backgroundColor: Colors.red,
                       duration: Duration(seconds: 3),
                     ),
@@ -749,7 +922,7 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
                           ),
                         Text(
                           widget.videoId.isEmpty
-                              ? "Comments (Video ID missing)"
+                              ? "Comments (missing something)"
                               : "Comments...",
                           style: TextStyle(
                             color: widget.videoId.isEmpty

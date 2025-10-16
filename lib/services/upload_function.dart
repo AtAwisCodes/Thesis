@@ -272,7 +272,8 @@ class VideoUploadService {
     required String videoPath,
     required String title,
     required String description,
-    required List<File>? modelImages, //Optional model images
+    required List<File>? modelImages,
+    required File? thumbnailImage,
     required Function(double progress, String status) onProgress,
   }) async {
     try {
@@ -296,27 +297,43 @@ class VideoUploadService {
         return VideoUploadResult.failure("File size exceeds 100MB limit");
       }
 
-      // Step 3: Upload model images if provided
+      // Step 3: Upload thumbnail image if provided
+      String thumbnailUrl = '';
+      if (thumbnailImage != null) {
+        onProgress(0.12, 'Uploading thumbnail...');
+        final ext = path.extension(thumbnailImage.path).toLowerCase();
+        final thumbnailFileName = '${_uuid.v4()}$ext';
+        final thumbnailFilePath = '${user.uid}/thumbnails/$thumbnailFileName';
+
+        await _supabase.storage
+            .from('videos')
+            .upload(thumbnailFilePath, thumbnailImage);
+        thumbnailUrl =
+            _supabase.storage.from('videos').getPublicUrl(thumbnailFilePath);
+        onProgress(0.15, 'Thumbnail uploaded');
+      }
+
+      // Step 4: Upload model images if provided
       List<String> modelImageUrls = [];
       if (modelImages != null && modelImages.isNotEmpty) {
-        onProgress(0.15, 'Uploading model images...');
+        onProgress(0.18, 'Uploading model images...');
         modelImageUrls = await uploadModelImages(
           imageFiles: modelImages,
           userId: user.uid,
           onProgress: (imgProgress, imgStatus) {
-            // Scale progress from 0.15 to 0.25
-            onProgress(0.15 + (imgProgress * 0.1), imgStatus);
+            // Scale progress from 0.18 to 0.28
+            onProgress(0.18 + (imgProgress * 0.1), imgStatus);
           },
         );
       }
 
-      // Step 4: Generate file path and name
+      // Step 5: Generate file path and name
       onProgress(0.3, 'Preparing video upload...');
       final fileExtension = path.extension(videoPath).toLowerCase();
       var fileName = '${_uuid.v4()}$fileExtension';
       var filePath = '${user.uid}/$fileName';
 
-      // Step 5: Upload video to Supabase Storage
+      // Step 6: Upload video to Supabase Storage
       onProgress(0.4, 'Uploading video to storage...');
       try {
         await _supabase.storage
@@ -340,10 +357,10 @@ class VideoUploadService {
       }
       onProgress(0.6, 'Video uploaded. Getting URL...');
 
-      // Step 6: Get public URL
+      // Step 7: Get public URL
       final publicUrl = _supabase.storage.from('videos').getPublicUrl(filePath);
 
-      // Step 7: Fetch uploader profile
+      // Step 8: Fetch uploader profile
       onProgress(0.7, 'Fetching user profile...');
       final userProfileDoc =
           await _firestore.collection('count').doc(user.uid).get();
@@ -361,7 +378,7 @@ class VideoUploadService {
 
       onProgress(0.75, 'Saving video metadata...');
 
-      // Step 8: Create video metadata with model images
+      // Step 9: Create video metadata with model images and thumbnail
       final videoMetadata = {
         'userId': user.uid,
         'title': title,
@@ -370,6 +387,7 @@ class VideoUploadService {
         'originalName': path.basename(videoPath),
         'filePath': filePath,
         'publicUrl': publicUrl,
+        'thumbnailUrl': thumbnailUrl,
         'fileSize': fileSize,
         'mimeType': _getAndroidMimeType(fileExtension),
         'duration': null,
@@ -389,16 +407,16 @@ class VideoUploadService {
         'has3DModel': false, // Will be updated when model is generated
       };
 
-      // Step 9: Save to Firestore
+      // Step 10: Save to Firestore
       onProgress(0.8, 'Saving to database...');
       final docRef = await _firestore.collection('videos').add(videoMetadata);
 
-      // Step 10: Add videoId field
+      // Step 11: Add videoId field
       await docRef.update({'videoId': docRef.id});
 
       onProgress(0.9, 'Video upload completed!');
 
-      // Step 11: Generate 3D model if model images were uploaded
+      // Step 12: Generate 3D model if model images were uploaded
       if (modelImageUrls.isNotEmpty && modelImageUrls.length >= 3) {
         onProgress(0.95, 'Initiating 3D model generation...');
 

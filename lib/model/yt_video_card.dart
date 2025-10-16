@@ -46,7 +46,7 @@ class YoutubeVideoCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Thumbnail with gradient + play icon overlay
+            // Thumbnail + play icon overlay
             Stack(
               children: [
                 Hero(
@@ -59,23 +59,6 @@ class YoutubeVideoCard extends StatelessWidget {
                       width: double.infinity,
                       height: screenHeight * 0.23,
                       fit: BoxFit.cover,
-                    ),
-                  ),
-                ),
-
-                // Gradient overlay
-                Container(
-                  height: screenHeight * 0.23,
-                  decoration: BoxDecoration(
-                    borderRadius:
-                        const BorderRadius.vertical(top: Radius.circular(16)),
-                    gradient: LinearGradient(
-                      begin: Alignment.bottomCenter,
-                      end: Alignment.topCenter,
-                      colors: [
-                        Colors.black.withOpacity(0.6),
-                        Colors.transparent,
-                      ],
                     ),
                   ),
                 ),

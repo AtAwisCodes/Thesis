@@ -142,6 +142,7 @@ class _FavoritePageState extends State<FavoritePage> {
     final lastName = video["lastName"] as String? ?? "";
     final avatarUrl = video["avatarUrl"] as String? ?? "";
     final thumbnailUrl = video["thumbnailUrl"] ?? "";
+    final views = video["views"] ?? 0;
 
     // Format uploaded date if available
     String uploadedAtText = "Unknown date";
@@ -193,7 +194,7 @@ class _FavoritePageState extends State<FavoritePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Thumbnail
+            // Thumbnail with play icon overlay
             Stack(
               children: [
                 ClipRRect(
@@ -212,21 +213,8 @@ class _FavoritePageState extends State<FavoritePage> {
                           color: Colors.black,
                         ),
                 ),
-                Container(
-                  height: screenHeight * 0.23,
-                  decoration: BoxDecoration(
-                    borderRadius:
-                        const BorderRadius.vertical(top: Radius.circular(16)),
-                    gradient: LinearGradient(
-                      begin: Alignment.bottomCenter,
-                      end: Alignment.topCenter,
-                      colors: [
-                        Colors.black.withOpacity(0.6),
-                        Colors.transparent,
-                      ],
-                    ),
-                  ),
-                ),
+
+                // Play button overlay
                 Positioned.fill(
                   child: Align(
                     alignment: Alignment.center,
@@ -240,12 +228,13 @@ class _FavoritePageState extends State<FavoritePage> {
               ],
             ),
 
-            // Details
+            // Video Details
             Padding(
               padding: EdgeInsets.all(screenWidth * 0.03),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Title
                   Text(
                     title,
                     maxLines: 2,
@@ -256,7 +245,10 @@ class _FavoritePageState extends State<FavoritePage> {
                       fontSize: screenWidth * 0.045,
                     ),
                   ),
+
                   SizedBox(height: screenHeight * 0.008),
+
+                  // Uploader + Views + Favorite Button
                   Row(
                     children: [
                       CircleAvatar(
@@ -280,9 +272,21 @@ class _FavoritePageState extends State<FavoritePage> {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
+                      Icon(Icons.visibility, size: 16, color: Colors.white54),
+                      const SizedBox(width: 4),
+                      Text(
+                        "$views",
+                        style: TextStyle(
+                          color: Colors.white54,
+                          fontSize: screenWidth * 0.032,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
                       IconButton(
                         icon:
                             const Icon(Icons.favorite, color: Colors.redAccent),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
                         onPressed: () {
                           FavoritesManager.instance.removeFavorite(videoId);
                         },

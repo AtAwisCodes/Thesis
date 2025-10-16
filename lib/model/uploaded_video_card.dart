@@ -4,7 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 
 class UploadedVideoCard extends StatelessWidget {
-  final Map<String, dynamic> videos; // Firestore video document
+  final Map<String, dynamic> videos;
 
   const UploadedVideoCard({super.key, required this.videos});
 
@@ -20,7 +20,6 @@ class UploadedVideoCard extends StatelessWidget {
     // video details
     final title = videos["title"] as String? ?? "Untitled";
     final views = videos["views"] ?? 0;
-    final likes = videos["likes"] ?? 0;
 
     // uploader details
     final uploaderAvatar = videos["avatarUrl"] as String?;
@@ -54,8 +53,7 @@ class UploadedVideoCard extends StatelessWidget {
               avatarUrl: avatarUrl,
               firstName: firstName,
               lastName: lastName,
-              videoId:
-                  videos["id"] ?? "", // ✅ Use actual video ID from Firestore
+              videoId: videos["id"] ?? "",
             ),
           ),
         );
@@ -79,7 +77,7 @@ class UploadedVideoCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Thumbnail with gradient + play icon overlay
+            // Thumbnail with play icon overlay
             Stack(
               children: [
                 ClipRRect(
@@ -97,23 +95,6 @@ class UploadedVideoCard extends StatelessWidget {
                           height: screenHeight * 0.23,
                           color: Colors.black,
                         ),
-                ),
-
-                // Gradient overlay
-                Container(
-                  height: screenHeight * 0.23,
-                  decoration: BoxDecoration(
-                    borderRadius:
-                        const BorderRadius.vertical(top: Radius.circular(16)),
-                    gradient: LinearGradient(
-                      begin: Alignment.bottomCenter,
-                      end: Alignment.topCenter,
-                      colors: [
-                        Colors.black.withOpacity(0.6),
-                        Colors.transparent,
-                      ],
-                    ),
-                  ),
                 ),
 
                 // Play button overlay
@@ -184,15 +165,6 @@ class UploadedVideoCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 12),
-                      Icon(Icons.favorite, size: 16, color: Colors.redAccent),
-                      const SizedBox(width: 4),
-                      Text(
-                        "$likes",
-                        style: TextStyle(
-                          color: Colors.white54,
-                          fontSize: screenWidth * 0.032,
-                        ),
-                      ),
                     ],
                   ),
                 ],

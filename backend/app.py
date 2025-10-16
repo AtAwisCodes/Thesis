@@ -25,19 +25,19 @@ try:
         # Use service account credentials
         credentials = service_account.Credentials.from_service_account_file(FIREBASE_CREDENTIALS_PATH)
         db = firestore.Client(credentials=credentials)
-        print("✅ Firestore initialized with service account credentials")
+        print("Firestore initialized with service account credentials")
     else:
-        print("⚠️ WARNING: firebase-credentials.json not found!")
-        print(f"   Expected location: {FIREBASE_CREDENTIALS_PATH}")
-        print("   Attempting to use Application Default Credentials...")
+        print("WARNING: firebase-credentials.json not found!")
+        print(f"Expected location: {FIREBASE_CREDENTIALS_PATH}")
+        print("Attempting to use Application Default Credentials...")
         db = firestore.Client()
 except Exception as e:
-    print(f"❌ ERROR: Failed to initialize Firestore: {e}")
-    print("\n🔧 To fix this, do ONE of the following:")
-    print("   1. Download your Firebase service account JSON from:")
-    print("      Firebase Console → Project Settings → Service Accounts → Generate New Private Key")
-    print(f"   2. Save it as: {FIREBASE_CREDENTIALS_PATH}")
-    print("   3. OR set GOOGLE_APPLICATION_CREDENTIALS environment variable")
+    print(f"ERROR: Failed to initialize Firestore: {e}")
+    print("\nTo fix this, do ONE of the following:")
+    print("1. Download your Firebase service account JSON from:")
+    print("Firebase Console → Project Settings → Service Accounts → Generate New Private Key")
+    print(f"2. Save it as: {FIREBASE_CREDENTIALS_PATH}")
+    print(" 3. OR set GOOGLE_APPLICATION_CREDENTIALS environment variable")
     print("\nServer will continue but Firestore operations will fail.\n")
     db = None
 

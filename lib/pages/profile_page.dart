@@ -413,6 +413,7 @@ class _ProfilePageState extends State<ProfilePage> {
     final String title = video['title'] ?? "Untitled";
     final String url = video['publicUrl'] ?? "";
     final String videoId = video['id'] ?? "";
+    final String thumbnailUrl = video['thumbnailUrl'] ?? "";
 
     Future<void> _deleteVideo() async {
       try {
@@ -450,21 +451,37 @@ class _ProfilePageState extends State<ProfilePage> {
           Column(
             children: [
               Expanded(
-                child: url.isNotEmpty
-                    ? ClipRRect(
-                        borderRadius: BorderRadius.circular(16),
-                        child: Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            Container(color: Colors.black26),
-                            const Center(
-                              child: Icon(Icons.play_circle_fill,
-                                  size: 50, color: Colors.white),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      // Thumbnail image
+                      thumbnailUrl.isNotEmpty
+                          ? Image.network(
+                              thumbnailUrl,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Container(
+                                  color: Colors.black26,
+                                  child: const Icon(Icons.broken_image,
+                                      size: 40, color: Colors.white54),
+                                );
+                              },
+                            )
+                          : Container(
+                              color: Colors.black26,
+                              child: const Icon(Icons.videocam,
+                                  size: 40, color: Colors.white54),
                             ),
-                          ],
-                        ),
-                      )
-                    : const Icon(Icons.videocam, size: 40),
+                      // Play button overlay
+                      const Center(
+                        child: Icon(Icons.play_circle_fill,
+                            size: 50, color: Colors.white),
+                      ),
+                    ],
+                  ),
+                ),
               ),
               Padding(
                 padding: const EdgeInsets.all(8.0),
@@ -472,6 +489,10 @@ class _ProfilePageState extends State<ProfilePage> {
                   title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
                 ),
               ),
             ],
