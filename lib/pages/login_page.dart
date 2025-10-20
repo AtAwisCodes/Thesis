@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:rexplore/components/my_button.dart';
 import 'package:rexplore/components/my_textfield.dart';
 import 'package:rexplore/components/square_tile.dart';
-import 'package:rexplore/pages/home_page.dart';
 import 'package:rexplore/services/auth_service.dart';
 
 class LoginPage extends StatefulWidget {
@@ -24,9 +23,14 @@ class _LoginPageState extends State<LoginPage> {
         email: emailController.text.trim(),
         password: passwordController.text.trim(),
       );
+      // Close the login dialog - AuthPage StreamBuilder will handle navigation
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
     } on FirebaseAuthException {
-      Navigator.pop(context);
-      showErrorMessage("Some information not matched in our system");
+      if (mounted) {
+        showErrorMessage("Some information not matched in our system");
+      }
     }
   }
 
@@ -181,31 +185,29 @@ class _LoginPageState extends State<LoginPage> {
                         try {
                           final userCredential =
                               await AuthService().signInWithGoogle();
-                          if (userCredential != null) {
-                            Navigator.of(context).pop(); // close login dialog
-                            Navigator.pushReplacement(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (context) => const HomePage()),
-                            );
+                          if (userCredential != null && mounted) {
+                            // Just close the dialog - AuthPage StreamBuilder will handle navigation
+                            Navigator.of(context).pop();
                           }
                         } catch (e) {
-                          showDialog(
-                            context: context,
-                            builder: (context) => AlertDialog(
-                              backgroundColor: Colors.deepPurple,
-                              title: const Center(
-                                child: Text(
-                                  'Google sign-in failed',
-                                  style: TextStyle(color: Colors.white),
+                          if (mounted) {
+                            showDialog(
+                              context: context,
+                              builder: (context) => AlertDialog(
+                                backgroundColor: Colors.deepPurple,
+                                title: const Center(
+                                  child: Text(
+                                    'Google sign-in failed',
+                                    style: TextStyle(color: Colors.white),
+                                  ),
+                                ),
+                                content: Text(
+                                  e.toString(),
+                                  style: const TextStyle(color: Colors.white),
                                 ),
                               ),
-                              content: Text(
-                                e.toString(),
-                                style: const TextStyle(color: Colors.white),
-                              ),
-                            ),
-                          );
+                            );
+                          }
                         }
                       },
                       imagePath: 'lib/icons/Google.png',

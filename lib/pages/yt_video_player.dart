@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:rexplore/image_recognition/SimpleYOLOCamera.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:rexplore/services/favorites_manager.dart';
+import 'package:rexplore/services/video_history_service.dart';
 
 class YtVideoPlayer extends StatefulWidget {
   final String videoId;
@@ -28,6 +29,7 @@ class YtVideoPlayer extends StatefulWidget {
 class _YtVideoPlayerState extends State<YtVideoPlayer> {
   late YoutubePlayerController _controller;
   final List<String> comments = [];
+  final VideoHistoryService _historyService = VideoHistoryService();
 
   bool isFollowed = false;
   bool isLiked = false;
@@ -47,6 +49,20 @@ class _YtVideoPlayerState extends State<YtVideoPlayer> {
 
     // load initial liked state
     isLiked = FavoritesManager.instance.contains(widget.videoId);
+
+    // Add to video history
+    _addToHistory();
+  }
+
+  /// Add YouTube video to user's watch history
+  Future<void> _addToHistory() async {
+    await _historyService.addToHistory(
+      videoId: widget.videoId,
+      videoUrl: 'https://www.youtube.com/watch?v=${widget.videoId}',
+      title: widget.videoTitle,
+      thumbnailUrl: widget.thumbnailUrl,
+      videoType: 'youtube',
+    );
   }
 
   @override

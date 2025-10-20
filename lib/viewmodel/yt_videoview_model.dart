@@ -46,5 +46,15 @@ class YtVideoviewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  // Reset all data when user signs out or switches accounts
+  void reset() {
+    playlistItems = [];
+    nextPageToken = null;
+    isLoading = false;
+    searchQuery = '';
+    print('DEBUG YtVideoviewModel.reset: All data cleared');
+    notifyListeners();
+  }
+
   void getUploadedVideos() {}
 }

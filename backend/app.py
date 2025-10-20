@@ -7,6 +7,8 @@ from supabase import create_client, Client
 import tempfile
 import os
 import json
+import threading
+import time
 
 app = Flask(__name__)
 CORS(app)
@@ -238,7 +240,7 @@ def fetch_generated_model():
         # Step 6: Save to Firestore
         model_doc = {
             "userId": user_id,
-            "videoId": video_id,  # Link to the original video
+            "videoId": video_id,  
             "taskId": task_id,
             "modelFileUrl": public_url,
             "source": "meshy",
@@ -434,8 +436,186 @@ def internal_error(error):
     return jsonify({"error": "Internal server error"}), 500
 
 
+# --- BACKGROUND AUTO-FETCH FUNCTIONALITY ---
+def fetch_and_save_model_internal(task_id, user_id, video_id):
+    """
+    Internal function to fetch and save a model.
+    Extracted from fetch_generated_model endpoint for reusability.
+    """
+    try:
+        print(f"[AUTO-FETCH] Processing task: {task_id}")
+        
+        # Step 1: Fetch model info from Meshy
+        response = requests.get(
+            f"https://api.meshy.ai/openapi/v1/multi-image-to-3d/{task_id}",
+            headers=get_meshy_headers(),
+            timeout=30
+        )
+        response.raise_for_status()
+        model_info = response.json()
+
+        # Check if succeeded (normalize to lowercase for comparison)
+        status = model_info.get("status", "").lower()
+        if status != "succeeded":
+            print(f"[AUTO-FETCH] Task {task_id} not ready yet: {model_info.get('status')}")
+            return False
+
+        # Get model URL
+        model_file_url = model_info.get("model_url") or model_info.get("model", {}).get("url")
+        if not model_file_url:
+            print(f"[AUTO-FETCH] No model URL for task {task_id}")
+            return False
+
+        # Step 2: Download GLB file
+        print(f"[AUTO-FETCH] Downloading .glb file for {task_id}...")
+        tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".glb")
+        model_data = requests.get(model_file_url, timeout=60)
+        model_data.raise_for_status()
+        tmp_file.write(model_data.content)
+        tmp_file.close()
+
+        # Step 3: Upload to Supabase
+        filename = f"{task_id}.glb"
+        print(f"[AUTO-FETCH] Uploading to Supabase: {filename}...")
+        
+        with open(tmp_file.name, "rb") as f:
+            supabase.storage.from_("models").upload(
+                filename, 
+                f, 
+                {"content-type": "model/gltf-binary", "upsert": "true"}
+            )
+
+        # Step 4: Get public URL
+        public_url = supabase.storage.from_("models").get_public_url(filename)
+        print(f"[AUTO-FETCH] Model public URL: {public_url}")
+
+        # Step 5: Save to Firestore
+        model_doc = {
+            "userId": user_id,
+            "videoId": video_id,
+            "taskId": task_id,
+            "modelFileUrl": public_url,
+            "source": "meshy",
+            "status": "ready",
+            "thumbnailUrl": model_info.get("thumbnail_url"),
+            "videoUrl": model_info.get("video_url"),
+            "createdAt": firestore.SERVER_TIMESTAMP,
+            "updatedAt": firestore.SERVER_TIMESTAMP,
+        }
+
+        doc_ref = db.collection("generated_models_files").add(model_doc)
+        print(f"[AUTO-FETCH] Saved to Firestore: {doc_ref[1].id}")
+
+        # Step 6: Update video document
+        if video_id:
+            db.collection("videos").document(video_id).update({
+                "has3DModel": True,
+                "generatedModelUrl": public_url,
+                "generatedModelId": doc_ref[1].id,
+                "meshyStatus": "completed",
+                "updatedAt": firestore.SERVER_TIMESTAMP,
+            })
+            print(f"[AUTO-FETCH] Updated video {video_id} with model info")
+
+        # Step 7: Cleanup
+        os.remove(tmp_file.name)
+        print(f"[AUTO-FETCH] ✅ Successfully processed task {task_id}")
+        
+        return True
+
+    except Exception as e:
+        print(f"[AUTO-FETCH] ❌ Error processing task {task_id}: {e}")
+        return False
+
+
+def auto_fetch_completed_models():
+    """
+    Background thread that automatically fetches completed models.
+    Polls Firestore for processing videos and checks their status.
+    """
+    print("[AUTO-FETCH] Background worker started")
+    
+    while True:
+        try:
+            # Find videos with processing status
+            videos_query = db.collection("videos").where("meshyStatus", "==", "processing").stream()
+            
+            processed_count = 0
+            for video_doc in videos_query:
+                video_data = video_doc.to_dict()
+                task_id = video_data.get("meshyTaskId")
+                user_id = video_data.get("userId")
+                video_id = video_doc.id
+                
+                if not task_id or not user_id:
+                    continue
+                
+                # Check if model already exists
+                existing_models = db.collection("generated_models_files").where("taskId", "==", task_id).limit(1).stream()
+                if any(existing_models):
+                    print(f"[AUTO-FETCH] Model already exists for task {task_id}, marking as completed")
+                    video_doc.reference.update({
+                        "meshyStatus": "completed",
+                        "updatedAt": firestore.SERVER_TIMESTAMP
+                    })
+                    continue
+                
+                # Check status with Meshy API
+                try:
+                    response = requests.get(
+                        f"https://api.meshy.ai/openapi/v1/multi-image-to-3d/{task_id}",
+                        headers=get_meshy_headers(),
+                        timeout=10
+                    )
+                    
+                    if response.status_code == 200:
+                        model_info = response.json()
+                        status = model_info.get("status", "").lower()
+                        progress = model_info.get("progress", 0)
+                        
+                        print(f"[AUTO-FETCH] Task {task_id}: {status} ({progress}%)")
+                        
+                        if status == "succeeded":
+                            # Fetch and save the model
+                            success = fetch_and_save_model_internal(task_id, user_id, video_id)
+                            if success:
+                                processed_count += 1
+                        elif status == "failed" or status == "canceled":
+                            # Mark as failed
+                            video_doc.reference.update({
+                                "meshyStatus": "failed",
+                                "modelGenerationError": f"Meshy API returned: {status}",
+                                "updatedAt": firestore.SERVER_TIMESTAMP
+                            })
+                            print(f"[AUTO-FETCH] Task {task_id} marked as failed")
+                            
+                except requests.exceptions.RequestException as e:
+                    print(f"[AUTO-FETCH] Network error checking task {task_id}: {e}")
+                    continue
+            
+            if processed_count > 0:
+                print(f"[AUTO-FETCH] ✅ Processed {processed_count} completed models")
+            
+            # Wait 10 seconds before next check
+            time.sleep(10)
+            
+        except Exception as e:
+            print(f"[AUTO-FETCH] ❌ Worker error: {e}")
+            time.sleep(30)  # Wait longer on error
+
+
 if __name__ == '__main__':
     print("Starting Meshy AR Backend Server...")
+    print("🔄 Starting automatic model fetching background worker...")
+    
+    # Start background thread for auto-fetching
+    if db is not None:
+        fetch_thread = threading.Thread(target=auto_fetch_completed_models, daemon=True)
+        fetch_thread.start()
+        print("✅ Auto-fetch worker running")
+    else:
+        print("⚠️ Firestore not initialized - auto-fetch disabled")
+    
     print("Server running on http://localhost:5000")
     print("Available endpoints:")
     print("  - GET  /api/health")

@@ -301,7 +301,35 @@ class _RegisterPageState extends State<RegisterPage> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     SquareTile(
-                      onTap: () => AuthService().signInWithGoogle(),
+                      onTap: () async {
+                        try {
+                          final userCredential =
+                              await AuthService().signInWithGoogle();
+                          if (userCredential != null && mounted) {
+                            Navigator.of(context)
+                                .pop(); // close register dialog
+                          }
+                        } catch (e) {
+                          if (mounted) {
+                            showDialog(
+                              context: context,
+                              builder: (context) => AlertDialog(
+                                backgroundColor: Colors.deepPurple,
+                                title: const Center(
+                                  child: Text(
+                                    'Google sign-in failed',
+                                    style: TextStyle(color: Colors.white),
+                                  ),
+                                ),
+                                content: Text(
+                                  e.toString(),
+                                  style: const TextStyle(color: Colors.white),
+                                ),
+                              ),
+                            );
+                          }
+                        }
+                      },
                       imagePath: 'lib/icons/Google.png',
                     ),
                   ],

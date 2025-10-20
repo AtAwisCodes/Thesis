@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:rexplore/viewmodel/yt_videoview_model.dart';
+import 'package:rexplore/pages/search_results_page.dart';
 
 class Search extends StatefulWidget {
   const Search({super.key});
@@ -40,8 +41,6 @@ class MySearchDelegate extends SearchDelegate {
   Widget? buildLeading(BuildContext context) => IconButton(
         icon: const Icon(Icons.arrow_back),
         onPressed: () {
-          // Only clear if user presses back with empty query (canceling search)
-          // If there's a query, it means they want to keep it
           if (query.isEmpty) {
             Provider.of<YtVideoviewModel>(context, listen: false).clearSearch();
             print(
@@ -69,7 +68,6 @@ class MySearchDelegate extends SearchDelegate {
 
   @override
   Widget buildResults(BuildContext context) {
-    // CRITICAL: Set the search query BEFORE closing
     if (query.trim().isNotEmpty) {
       final trimmedQuery = query.trim();
       print('DEBUG: buildResults called with query: "$trimmedQuery"');
@@ -80,13 +78,22 @@ class MySearchDelegate extends SearchDelegate {
       print(
           'DEBUG: After setSearchQuery, viewModel.searchQuery = "${viewModel.searchQuery}"');
 
-      // Small delay to ensure state is updated before closing
-      Future.microtask(() {
-        print('DEBUG: Closing search interface');
-        close(context, query);
+      // Close search interface first
+      print('DEBUG: Closing search interface');
+      close(context, null);
+
+      // Navigate to search results page after the close operation completes
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        print('DEBUG: Navigating to results page');
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const SearchResultsPage(),
+          ),
+        );
       });
     } else {
-      close(context, query);
+      close(context, null);
     }
     return Container();
   }

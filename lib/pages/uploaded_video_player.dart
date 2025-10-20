@@ -4,6 +4,9 @@ import 'package:video_player/video_player.dart';
 import 'package:rexplore/services/favorites_manager.dart';
 import 'package:rexplore/augmented_reality/augmented_camera.dart';
 import 'package:rexplore/services/upload_function.dart';
+import 'package:rexplore/services/follow_service.dart';
+import 'package:rexplore/services/notification_service.dart';
+import 'package:rexplore/services/video_history_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -36,6 +39,9 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
   final List<Map<String, dynamic>> comments = [];
   final _commentController = TextEditingController();
   final VideoUploadService _uploadService = VideoUploadService();
+  final FollowService _followService = FollowService();
+  final NotificationService _notificationService = NotificationService();
+  final VideoHistoryService _historyService = VideoHistoryService();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
@@ -47,13 +53,14 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
   String? _modelError;
   bool _isLoadingComments = true;
   int _viewCount = 0;
+  String? _uploaderUserId;
 
   @override
   void initState() {
     super.initState();
 
     print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    print('📹 UploadedVideoPlayer initialized');
+    print('UploadedVideoPlayer initialized');
     print('Video ID: ${widget.videoId}');
     print('Video URL: ${widget.videoUrl}');
     print('Title: ${widget.title}');
@@ -70,6 +77,9 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
     // Load initial liked state
     isLiked = FavoritesManager.instance.contains(widget.videoUrl);
 
+    // Add video to watch history
+    _addToHistory();
+
     // Increment view count when video is opened
     _incrementViewCount();
 
@@ -78,6 +88,50 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
 
     // Load comments
     _loadComments();
+
+    // Load uploader user ID and check follow status
+    _loadUploaderInfo();
+  }
+
+  /// Load uploader user ID from video document and check follow status
+  Future<void> _loadUploaderInfo() async {
+    try {
+      if (widget.videoId.isEmpty) return;
+
+      final videoDoc =
+          await _firestore.collection('videos').doc(widget.videoId).get();
+      if (videoDoc.exists) {
+        final data = videoDoc.data()!;
+        _uploaderUserId = data['userId'] as String?;
+
+        if (_uploaderUserId != null) {
+          // Check if current user is following this uploader
+          final following = await _followService.isFollowing(_uploaderUserId!);
+          if (mounted) {
+            setState(() {
+              isFollowed = following;
+            });
+          }
+        }
+      }
+    } catch (e) {
+      print('Error loading uploader info: $e');
+    }
+  }
+
+  /// Add video to user's watch history
+  Future<void> _addToHistory() async {
+    await _historyService.addToHistory(
+      videoId: widget.videoId,
+      videoUrl: widget.videoUrl,
+      title: widget.title,
+      thumbnailUrl: '', // Will be fetched from Firestore if needed
+      uploadedAt: widget.uploadedAt,
+      avatarUrl: widget.avatarUrl,
+      firstName: widget.firstName,
+      lastName: widget.lastName,
+      videoType: 'uploaded',
+    );
   }
 
   // Increment view count in Firestore
@@ -460,6 +514,99 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
         FavoritesManager.instance.removeFavorite(widget.videoUrl);
       }
     });
+
+    // Send like notification if user liked the video
+    if (isLiked && _uploaderUserId != null) {
+      final currentUser = _auth.currentUser;
+      if (currentUser != null) {
+        await _notificationService.sendLikeNotification(
+          videoId: widget.videoId,
+          videoOwnerId: _uploaderUserId!,
+          likerUserId: currentUser.uid,
+          videoTitle: widget.title,
+        );
+      }
+    }
+  }
+
+  /// Toggle follow/unfollow for the video uploader
+  Future<void> _toggleFollow() async {
+    if (_uploaderUserId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Unable to follow user at this time'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please login to follow users'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    // Don't allow following yourself
+    if (currentUser.uid == _uploaderUserId) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('You cannot follow yourself'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      isFollowed = !isFollowed;
+    });
+
+    bool success;
+    if (isFollowed) {
+      success = await _followService.followUser(_uploaderUserId!);
+      if (success && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content:
+                Text('Now following ${widget.firstName} ${widget.lastName}'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } else {
+      success = await _followService.unfollowUser(_uploaderUserId!);
+      if (success && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Unfollowed ${widget.firstName} ${widget.lastName}'),
+            backgroundColor: Colors.grey,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+
+    // If operation failed, revert the state
+    if (!success) {
+      setState(() {
+        isFollowed = !isFollowed;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to update follow status. Please try again.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   // Open comments modal
@@ -777,7 +924,7 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
                   // View counts
                   Row(
                     children: [
@@ -852,11 +999,7 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
                         width: 90,
                         height: 36,
                         child: ElevatedButton(
-                          onPressed: () {
-                            setState(() {
-                              isFollowed = !isFollowed;
-                            });
-                          },
+                          onPressed: _toggleFollow,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: isFollowed
                                 ? Colors.grey

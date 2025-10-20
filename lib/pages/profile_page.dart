@@ -4,8 +4,13 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:rexplore/services/upload_function.dart';
+import 'package:rexplore/services/follow_service.dart';
+import 'package:rexplore/services/video_history_service.dart';
+import 'package:rexplore/pages/uploaded_video_player.dart';
+import 'package:rexplore/pages/yt_video_player.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:video_player/video_player.dart';
+import 'package:intl/intl.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -21,6 +26,8 @@ class _ProfilePageState extends State<ProfilePage> {
   String bio = 'This is your bio. Tap edit to update.';
   String avatarUrl = '';
   int postsCount = 0;
+  int followersCount = 0;
+  int followingCount = 0;
 
   bool isLoading = true;
   File? _pickedImage;
@@ -30,6 +37,8 @@ class _ProfilePageState extends State<ProfilePage> {
   final TextEditingController bioController = TextEditingController();
 
   final VideoUploadService _videoService = VideoUploadService();
+  final FollowService _followService = FollowService();
+  final VideoHistoryService _historyService = VideoHistoryService();
 
   @override
   void initState() {
@@ -39,7 +48,16 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Future<void> _loadUserInfo() async {
     try {
-      final uid = FirebaseAuth.instance.currentUser!.uid;
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) {
+        print('No user logged in');
+        setState(() {
+          isLoading = false;
+        });
+        return;
+      }
+
+      final uid = currentUser.uid;
       final doc =
           await FirebaseFirestore.instance.collection('count').doc(uid).get();
 
@@ -51,7 +69,9 @@ class _ProfilePageState extends State<ProfilePage> {
           email = data['email'] ?? '';
           bio = data['bio'] ?? 'No bio available.';
           avatarUrl = data['avatar_url'] ?? '';
-          postsCount = data['posts'] ?? 0; // legacy fetch
+          postsCount = data['posts'] ?? 0;
+          followersCount = data['followersCount'] ?? 0;
+          followingCount = data['followingCount'] ?? 0;
         });
       } else {
         print("User document not found");
@@ -77,7 +97,12 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Future<void> _uploadAndSaveAvatar(File file) async {
     try {
-      final firebaseUser = FirebaseAuth.instance.currentUser!;
+      final firebaseUser = FirebaseAuth.instance.currentUser;
+      if (firebaseUser == null) {
+        print("No user logged in");
+        return;
+      }
+
       final filePath = "${firebaseUser.uid}/avatar.png";
 
       final supabase = Supabase.instance.client;
@@ -162,6 +187,12 @@ class _ProfilePageState extends State<ProfilePage> {
               const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: () async {
+                  final currentUser = FirebaseAuth.instance.currentUser;
+                  if (currentUser == null) {
+                    Navigator.pop(context);
+                    return;
+                  }
+
                   final fullName = nameController.text.trim();
                   final nameParts = fullName.split(' ');
                   String updatedFirstName =
@@ -176,7 +207,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     bio = bioController.text.trim();
                   });
 
-                  final uid = FirebaseAuth.instance.currentUser!.uid;
+                  final uid = currentUser.uid;
 
                   if (_pickedImage != null) {
                     await _uploadAndSaveAvatar(_pickedImage!);
@@ -197,6 +228,180 @@ class _ProfilePageState extends State<ProfilePage> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  /// Show followers list
+  void _showFollowersList() {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) return;
+
+    final uid = currentUser.uid;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.7,
+        minChildSize: 0.4,
+        maxChildSize: 0.95,
+        builder: (context, scrollController) {
+          return Column(
+            children: [
+              Container(
+                height: 5,
+                width: 40,
+                margin: const EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(
+                  color: Colors.grey,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              const Padding(
+                padding: EdgeInsets.all(16.0),
+                child: Text(
+                  'Followers',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              Expanded(
+                child: StreamBuilder<List<Map<String, dynamic>>>(
+                  stream: _followService.getFollowers(uid),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+
+                    if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                      return const Center(
+                        child: Text('No followers yet'),
+                      );
+                    }
+
+                    final followers = snapshot.data!;
+                    return ListView.builder(
+                      controller: scrollController,
+                      itemCount: followers.length,
+                      itemBuilder: (context, index) {
+                        final follower = followers[index];
+                        return ListTile(
+                          leading: CircleAvatar(
+                            backgroundImage: follower['avatarUrl'] != null &&
+                                    follower['avatarUrl'].isNotEmpty
+                                ? NetworkImage(follower['avatarUrl'])
+                                : null,
+                            child: follower['avatarUrl'] == null ||
+                                    follower['avatarUrl'].isEmpty
+                                ? const Icon(Icons.person)
+                                : null,
+                          ),
+                          title: Text(
+                            '${follower['firstName']} ${follower['lastName']}',
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  /// Show following list
+  void _showFollowingList() {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) return;
+
+    final uid = currentUser.uid;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.7,
+        minChildSize: 0.4,
+        maxChildSize: 0.95,
+        builder: (context, scrollController) {
+          return Column(
+            children: [
+              Container(
+                height: 5,
+                width: 40,
+                margin: const EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(
+                  color: Colors.grey,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              const Padding(
+                padding: EdgeInsets.all(16.0),
+                child: Text(
+                  'Following',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              Expanded(
+                child: StreamBuilder<List<Map<String, dynamic>>>(
+                  stream: _followService.getFollowing(uid),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+
+                    if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                      return const Center(
+                        child: Text('Not following anyone yet'),
+                      );
+                    }
+
+                    final following = snapshot.data!;
+                    return ListView.builder(
+                      controller: scrollController,
+                      itemCount: following.length,
+                      itemBuilder: (context, index) {
+                        final user = following[index];
+                        return ListTile(
+                          leading: CircleAvatar(
+                            backgroundImage: user['avatarUrl'] != null &&
+                                    user['avatarUrl'].isNotEmpty
+                                ? NetworkImage(user['avatarUrl'])
+                                : null,
+                            child: user['avatarUrl'] == null ||
+                                    user['avatarUrl'].isEmpty
+                                ? const Icon(Icons.person)
+                                : null,
+                          ),
+                          title: Text(
+                            '${user['firstName']} ${user['lastName']}',
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -336,7 +541,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
                     const SizedBox(height: 30),
 
-                    // Stats Row (Posts now live count)
+                    // Stats Row
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
@@ -348,7 +553,16 @@ class _ProfilePageState extends State<ProfilePage> {
                             return _buildStat("Posts", count.toString());
                           },
                         ),
-                        _buildStat("Followers", "3.4k"),
+                        GestureDetector(
+                          onTap: _showFollowersList,
+                          child: _buildStat(
+                              "Followers", followersCount.toString()),
+                        ),
+                        GestureDetector(
+                          onTap: _showFollowingList,
+                          child: _buildStat(
+                              "Following", followingCount.toString()),
+                        ),
                       ],
                     ),
 
@@ -356,14 +570,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
                     // History
                     _buildSectionTitle("History"),
-                    SizedBox(
-                      height: 150,
-                      child: ListView.builder(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: 5,
-                        itemBuilder: (context, index) => _buildHistoryCard(),
-                      ),
-                    ),
+                    _buildHistorySection(),
 
                     const SizedBox(height: 30),
 
@@ -397,15 +604,186 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  Widget _buildHistoryCard() {
-    return Container(
-      width: 120,
-      margin: const EdgeInsets.only(right: 12),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        color: Colors.grey.shade200,
+  // History section with functional video playback
+  Widget _buildHistorySection() {
+    return StreamBuilder<List<Map<String, dynamic>>>(
+      stream: _historyService.getHistory(),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return const Padding(
+            padding: EdgeInsets.all(16.0),
+            child: Text("Error loading history"),
+          );
+        }
+
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const SizedBox(
+            height: 150,
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return const SizedBox(
+            height: 150,
+            child: Center(
+              child: Text(
+                "No watch history yet",
+                style: TextStyle(color: Colors.grey),
+              ),
+            ),
+          );
+        }
+
+        final historyVideos = snapshot.data!;
+        return SizedBox(
+          height: 150,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            itemCount: historyVideos.length,
+            itemBuilder: (context, index) {
+              final video = historyVideos[index];
+              return _buildHistoryVideoCard(video);
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  // Build individual history video card
+  Widget _buildHistoryVideoCard(Map<String, dynamic> video) {
+    final String title = video['title'] ?? "Untitled";
+    final String thumbnailUrl = video['thumbnailUrl'] ?? "";
+    final String videoType = video['videoType'] ?? 'uploaded';
+
+    return GestureDetector(
+      onTap: () {
+        if (videoType == 'youtube') {
+          _playYouTubeVideo(video);
+        } else {
+          _playUploadedVideo(video);
+        }
+      },
+      child: Container(
+        width: 120,
+        margin: const EdgeInsets.only(right: 12),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          color: Colors.black12,
+        ),
+        child: Stack(
+          children: [
+            Column(
+              children: [
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        // Thumbnail image
+                        thumbnailUrl.isNotEmpty
+                            ? Image.network(
+                                thumbnailUrl,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Container(
+                                    color: Colors.black26,
+                                    child: const Icon(Icons.broken_image,
+                                        size: 30, color: Colors.white54),
+                                  );
+                                },
+                              )
+                            : Container(
+                                color: Colors.black26,
+                                child: const Icon(Icons.videocam,
+                                    size: 30, color: Colors.white54),
+                              ),
+                        // Play button overlay
+                        const Center(
+                          child: Icon(Icons.play_circle_fill,
+                              size: 40, color: Colors.white),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(6.0),
+                  child: Text(
+                    title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w500,
+                      fontSize: 10,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
-      child: const Center(child: Text("History Item")),
+    );
+  }
+
+  // Play YouTube video from history
+  void _playYouTubeVideo(Map<String, dynamic> video) {
+    final String videoId = video['videoId'] ?? '';
+    final String title = video['title'] ?? 'Untitled';
+    final String thumbnailUrl = video['thumbnailUrl'] ?? '';
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => YtVideoPlayer(
+          videoId: videoId,
+          videoTitle: title,
+          viewsCount: '0',
+          channelName: '',
+          thumbnailUrl: thumbnailUrl,
+        ),
+      ),
+    );
+  }
+
+  // Play uploaded video from history
+  void _playUploadedVideo(Map<String, dynamic> video) async {
+    final String videoId = video['videoId'] ?? '';
+    final String videoUrl = video['videoUrl'] ?? '';
+    final String title = video['title'] ?? 'Untitled';
+
+    if (videoUrl.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Video URL is missing")),
+      );
+      return;
+    }
+
+    // Format uploaded date
+    String uploadedAtText = video['uploadedAt'] ?? 'Unknown date';
+    if (video['uploadedAt'] is Timestamp) {
+      final date = (video['uploadedAt'] as Timestamp).toDate();
+      uploadedAtText = DateFormat('MMM d, yyyy').format(date);
+    }
+
+    // Navigate to video player with AR support
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => UploadedVideoPlayer(
+          videoUrl: videoUrl,
+          title: title,
+          uploadedAt: uploadedAtText,
+          avatarUrl: video['avatarUrl'] ?? '',
+          firstName: video['firstName'] ?? '',
+          lastName: video['lastName'] ?? '',
+          videoId: videoId,
+        ),
+      ),
     );
   }
 

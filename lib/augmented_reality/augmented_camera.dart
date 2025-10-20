@@ -63,6 +63,20 @@ class _MeshyARCameraState extends State<MeshyARCamera> {
       // If videoId is provided, load models specifically for this video
       if (widget.videoId != null) {
         models = await MeshyApiService.getModelsForVideo(widget.videoId!);
+
+        // If models exist, automatically select the first/latest one
+        if (models.isNotEmpty) {
+          setState(() {
+            _availableModels = models;
+            _selectedModelUrl = models[0]['modelFileUrl'];
+            _isLoadingModel = false;
+            _statusMessage = "✅ Model loaded! Tap screen to place in AR";
+          });
+
+          debugPrint("✅ Auto-selected model: ${models[0]['taskId']}");
+          debugPrint("   Model URL: $_selectedModelUrl");
+          return;
+        }
       } else {
         // Otherwise load all available models
         models = await MeshyApiService.listAllModels();
@@ -73,7 +87,7 @@ class _MeshyARCameraState extends State<MeshyARCamera> {
         _isLoadingModel = false;
         if (_availableModels.isNotEmpty) {
           _statusMessage =
-              "${_availableModels.length} models available for this video";
+              "${_availableModels.length} models available. Tap icon to select.";
         } else {
           _statusMessage = "No models found. Generate a new one!";
         }
@@ -276,10 +290,6 @@ Model: ${iosInfo.model}
                   icon: const Icon(Icons.view_in_ar),
                   onPressed: _showModelSelector,
                 ),
-                IconButton(
-                  icon: const Icon(Icons.delete),
-                  onPressed: _removeAllNodes,
-                ),
               ]
             : null,
       ),
@@ -380,7 +390,7 @@ Model: ${iosInfo.model}
             ),
             child: Text(
               _selectedModelUrl != null
-                  ? 'Tap screen to place 3D model from Meshy AI'
+                  ? 'Tap screen to place 3D model'
                   : 'Select a model from the menu above',
               style: TextStyle(color: Colors.white, fontSize: 12),
               textAlign: TextAlign.center,
@@ -534,21 +544,5 @@ Model: ${iosInfo.model}
         _statusMessage = "Error: $e";
       });
     }
-  }
-
-  Future<void> _removeAllNodes() async {
-    for (var node in nodes) {
-      await arObjectManager?.removeNode(node);
-    }
-    nodes.clear();
-
-    for (var anchor in anchors) {
-      await arAnchorManager?.removeAnchor(anchor);
-    }
-    anchors.clear();
-
-    setState(() {
-      _statusMessage = "All objects cleared";
-    });
   }
 }

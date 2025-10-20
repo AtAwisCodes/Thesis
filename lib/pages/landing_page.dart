@@ -1,6 +1,6 @@
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:flutter/material.dart';
-import 'package:rexplore/pages/auth_page.dart';
+import 'package:rexplore/pages/login_or_register_page.dart';
 
 class LandingPage extends StatefulWidget {
   const LandingPage({super.key});
@@ -85,8 +85,11 @@ class _LandingPage extends State<LandingPage> {
             SizedBox(height: 60),
             ElevatedButton(
               onPressed: () {
-                showDialog(
-                    context: context, builder: (context) => const AuthPage());
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) => const LoginOrRegisterPage()),
+                );
               },
               style: ElevatedButton.styleFrom(
                 padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),

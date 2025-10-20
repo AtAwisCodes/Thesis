@@ -180,4 +180,69 @@ class MeshyApiService {
       return false;
     }
   }
+
+  /// Automatically fetch model if ready (for background processing)
+  /// Returns true if model was fetched, false if not ready yet
+  static Future<bool> autoFetchModelIfReady({
+    required String taskId,
+    required String userId,
+  }) async {
+    try {
+      // First check status
+      final statusResponse = await checkModelStatus(taskId);
+      final status = statusResponse['status']?.toString().toLowerCase();
+
+      if (status == 'succeeded') {
+        // Model is ready, fetch it
+        print('Auto-fetching completed model: $taskId');
+        final result = await fetchCompletedModel(
+          taskId: taskId,
+          userId: userId,
+        );
+
+        if (result['success'] == true) {
+          print('Auto-fetch successful: ${result['model_public_url']}');
+          return true;
+        }
+      }
+
+      return false;
+    } catch (e) {
+      print('Auto-fetch error: $e');
+      return false;
+    }
+  }
+
+  /// Fetch model with detailed result
+  static Future<Map<String, dynamic>> fetchModel({
+    required String taskId,
+    required String userId,
+  }) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/api/fetch-model'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'task_id': taskId,
+              'user_id': userId,
+            }),
+          )
+          .timeout(
+            const Duration(minutes: 5), // GLB download can take time
+          );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        print('Model fetched successfully');
+        print('URL: ${data['model_public_url']}');
+        print('Firestore ID: ${data['firestore_doc_id']}');
+        return data;
+      } else {
+        throw Exception('Failed to fetch model: ${response.body}');
+      }
+    } catch (e) {
+      throw Exception('Error fetching model: $e');
+    }
+  }
 }

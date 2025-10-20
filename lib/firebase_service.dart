@@ -14,7 +14,13 @@ class FirebaseService {
     String bio = 'bio',
   }) async {
     try {
-      final uid = _auth.currentUser!.uid;
+      final currentUser = _auth.currentUser;
+      if (currentUser == null) {
+        print('No user logged in');
+        return false;
+      }
+
+      final uid = currentUser.uid;
 
       Map<String, dynamic> userData = {
         'first_name': firstName,

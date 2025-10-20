@@ -6,6 +6,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'notification_service.dart';
 
 class VideoUploadResult {
   final bool success;
@@ -44,6 +45,7 @@ class VideoUploadService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final Uuid _uuid = const Uuid();
+  final NotificationService _notificationService = NotificationService();
 
   //DITO MO LAGAY IP MO LANS YESHUA DE GUZMAN
   static const String _backendUrl = 'http://192.168.100.25:5000';
@@ -198,13 +200,26 @@ class VideoUploadService {
           final statusLower = status?.toString().toLowerCase();
 
           if (statusLower == 'succeeded') {
-            // Model is ready, fetch it
-            onStatusUpdate('Fetching completed model...');
-            return await _fetchCompletedModel(
+            // Model is ready, fetch it immediately
+            onStatusUpdate('✅ Model completed! Fetching GLB file...');
+
+            final fetchResult = await _fetchCompletedModel(
               taskId: taskId,
               userId: userId,
               onStatusUpdate: onStatusUpdate,
             );
+
+            if (fetchResult != null && fetchResult['success'] == true) {
+              print('✅ GLB file downloaded and saved!');
+              print('   Model URL: ${fetchResult['model_public_url']}');
+              print('   Firestore ID: ${fetchResult['firestore_doc_id']}');
+              onStatusUpdate('✅ 3D model ready for AR!');
+              return fetchResult;
+            } else {
+              print('❌ Fetch returned null or failed');
+              onStatusUpdate('⚠️ Model completed but download failed');
+              return null;
+            }
           } else if (statusLower == 'failed' || statusLower == 'canceled') {
             throw Exception('Model generation $status');
           }
@@ -452,6 +467,14 @@ class VideoUploadService {
 
       onProgress(1.0, 'All done!');
 
+      // Send notification to followers about new video (asynchronously)
+      _sendNewVideoNotificationAsync(
+        videoId: docRef.id,
+        userId: user.uid,
+        videoTitle: title,
+        thumbnailUrl: thumbnailUrl,
+      );
+
       return VideoUploadResult.success(
         videoId: docRef.id,
         publicUrl: publicUrl,
@@ -516,6 +539,28 @@ class VideoUploadService {
       } catch (firestoreError) {
         print('Could not update Firestore with error: $firestoreError');
       }
+    }
+  }
+
+  //Send notification to followers asynchronously (non-blocking)
+  Future<void> _sendNewVideoNotificationAsync({
+    required String videoId,
+    required String userId,
+    required String videoTitle,
+    required String thumbnailUrl,
+  }) async {
+    try {
+      print('Sending new video notifications to followers...');
+      await _notificationService.sendNewVideoNotification(
+        uploaderUserId: userId,
+        videoId: videoId,
+        videoTitle: videoTitle,
+        videoThumbnailUrl: thumbnailUrl,
+      );
+      print('New video notifications sent successfully');
+    } catch (e) {
+      print('Error sending new video notifications: $e');
+      // Don't fail the upload if notification fails
     }
   }
 

@@ -13,6 +13,7 @@ import 'package:rexplore/pages/upload_page.dart';
 import 'package:rexplore/pages/videos_page.dart';
 import 'package:rexplore/pages/search_bar.dart';
 import 'package:rexplore/services/ThemeProvider.dart';
+import 'package:rexplore/services/auth_service.dart';
 import 'package:rexplore/viewmodel/yt_videoview_model.dart';
 
 class HomePage extends StatefulWidget {
@@ -22,16 +23,23 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-final user = FirebaseAuth.instance.currentUser!;
-void signUserOut() {
-  FirebaseAuth.instance.signOut();
-}
-
 //Const fallback avatar image
 const ImageProvider defaultAvatar = AssetImage('lib/icons/ReXplore.png');
 
 class _HomePageState extends State<HomePage> {
   int page = 0;
+
+  // Get current user dynamically instead of using a static variable
+  User? get currentUser => FirebaseAuth.instance.currentUser;
+
+  void signUserOut() async {
+    // Clear any cached data before signing out
+    final ytVideoViewModel =
+        Provider.of<YtVideoviewModel>(context, listen: false);
+    ytVideoViewModel.reset();
+
+    await AuthService().signOut();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -74,10 +82,12 @@ class _HomePageState extends State<HomePage> {
       drawer: (page == 4)
           ? Drawer(
               child: StreamBuilder<DocumentSnapshot>(
-                stream: FirebaseFirestore.instance
-                    .collection("count")
-                    .doc(user.uid)
-                    .snapshots(),
+                stream: currentUser != null
+                    ? FirebaseFirestore.instance
+                        .collection("count")
+                        .doc(currentUser!.uid)
+                        .snapshots()
+                    : Stream.empty(),
                 builder: (context, snapshot) {
                   String? avatarUrl;
                   if (snapshot.hasData &&
@@ -103,10 +113,10 @@ class _HomePageState extends State<HomePage> {
                           decoration:
                               const BoxDecoration(color: Colors.transparent),
                           accountName: Text(
-                            user.displayName ?? "User",
+                            currentUser?.displayName ?? "User",
                             style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
-                          accountEmail: Text(user.email ?? ""),
+                          accountEmail: Text(currentUser?.email ?? ""),
                           currentAccountPicture: CircleAvatar(
                             radius: 30,
                             backgroundColor: Colors.transparent,
@@ -267,10 +277,12 @@ class _HomePageState extends State<HomePage> {
               child: SizedBox(
                 height: 100,
                 child: StreamBuilder<DocumentSnapshot>(
-                  stream: FirebaseFirestore.instance
-                      .collection("count")
-                      .doc(user.uid)
-                      .snapshots(),
+                  stream: currentUser != null
+                      ? FirebaseFirestore.instance
+                          .collection("count")
+                          .doc(currentUser!.uid)
+                          .snapshots()
+                      : Stream.empty(),
                   builder: (context, snapshot) {
                     String? avatarUrl;
                     if (snapshot.hasData &&

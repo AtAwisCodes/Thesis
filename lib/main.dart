@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 import 'package:provider/provider.dart';
 import 'package:rexplore/firebase_service.dart';
-import 'package:rexplore/pages/landing_page.dart';
+import 'package:rexplore/pages/auth_page.dart';
 import 'package:rexplore/services/ThemeProvider.dart';
 import 'package:rexplore/theme.dart/darkTheme.dart';
 import 'package:rexplore/theme.dart/lightTheme.dart';
@@ -14,8 +14,6 @@ import 'firebase_options.dart';
 
 List<CameraDescription> cameras = [];
 
-/// Main entry point for the application
-/// Initializes Firebase, Supabase, and camera access before running the app.
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -28,7 +26,6 @@ void main() async {
         'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InluanFjYXh4b2Z0ZXFmYmNuYnB5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ5OTUzNDEsImV4cCI6MjA3MDU3MTM0MX0.mSqnKhqSmrICZ5B2iCDcQgeOLF3xCgC1MnMnF1FbzMM',
   );
 
-  //ADD FIREBASE OPTIONS
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
@@ -56,7 +53,7 @@ class MyApp extends StatelessWidget {
       theme: lightTheme,
       darkTheme: darkTheme,
       themeMode: themeProvider.isDarkMode ? ThemeMode.dark : ThemeMode.light,
-      home: const LandingPage(),
+      home: const AuthPage(),
     );
   }
 }
