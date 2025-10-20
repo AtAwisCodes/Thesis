@@ -9,6 +9,9 @@ class VideoHistoryService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
+  // Maximum number of videos to keep in history (0 = unlimited)
+  static const int maxHistoryItems = 100;
+
   /// Add video to user's watch history
   Future<void> addToHistory({
     required String videoId,
@@ -61,9 +64,45 @@ class VideoHistoryService {
           'watchCount': 1,
         });
         print('Added new video to history: $videoId');
+
+        // Cleanup old history items if limit is set
+        if (maxHistoryItems > 0) {
+          await _cleanupOldHistory();
+        }
       }
     } catch (e) {
       print('Error adding video to history: $e');
+    }
+  }
+
+  /// Remove oldest history items if exceeding the limit
+  Future<void> _cleanupOldHistory() async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) return;
+
+      final historySnapshot = await _firestore
+          .collection('users')
+          .doc(user.uid)
+          .collection('videoHistory')
+          .orderBy('lastWatchedAt', descending: true)
+          .get();
+
+      final itemCount = historySnapshot.docs.length;
+
+      if (itemCount > maxHistoryItems) {
+        final itemsToDelete = historySnapshot.docs.skip(maxHistoryItems);
+        final batch = _firestore.batch();
+
+        for (var doc in itemsToDelete) {
+          batch.delete(doc.reference);
+        }
+
+        await batch.commit();
+        print('Cleaned up ${itemsToDelete.length} old history items');
+      }
+    } catch (e) {
+      print('Error cleaning up old history: $e');
     }
   }
 

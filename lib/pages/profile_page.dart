@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:rexplore/services/upload_function.dart';
 import 'package:rexplore/services/follow_service.dart';
 import 'package:rexplore/services/video_history_service.dart';
+import 'package:rexplore/services/user_profile_sync_service.dart';
 import 'package:rexplore/pages/uploaded_video_player.dart';
 import 'package:rexplore/pages/yt_video_player.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -39,6 +40,7 @@ class _ProfilePageState extends State<ProfilePage> {
   final VideoUploadService _videoService = VideoUploadService();
   final FollowService _followService = FollowService();
   final VideoHistoryService _historyService = VideoHistoryService();
+  final UserProfileSyncService _profileSyncService = UserProfileSyncService();
 
   @override
   void initState() {
@@ -208,20 +210,73 @@ class _ProfilePageState extends State<ProfilePage> {
                   });
 
                   final uid = currentUser.uid;
+                  String updatedAvatarUrl = avatarUrl;
 
-                  if (_pickedImage != null) {
-                    await _uploadAndSaveAvatar(_pickedImage!);
+                  // Show loading indicator
+                  showDialog(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (context) => const Center(
+                      child: CircularProgressIndicator(),
+                    ),
+                  );
+
+                  try {
+                    // Upload avatar if changed
+                    if (_pickedImage != null) {
+                      await _uploadAndSaveAvatar(_pickedImage!);
+                      updatedAvatarUrl = avatarUrl; // Get updated avatar URL
+                    }
+
+                    // Update Firestore user profile
+                    await FirebaseFirestore.instance
+                        .collection('count')
+                        .doc(uid)
+                        .update({
+                      'first_name': updatedFirstName,
+                      'last_name': updatedLastName,
+                      'bio': bio,
+                    });
+
+                    // Sync profile changes to all videos, comments, etc.
+                    await _profileSyncService.syncAllUserData(
+                      userId: uid,
+                      firstName: updatedFirstName,
+                      lastName: updatedLastName,
+                      avatarUrl: updatedAvatarUrl,
+                    );
+
+                    // Close loading dialog
+                    if (mounted) Navigator.pop(context);
+
+                    // Close edit dialog
+                    if (mounted) Navigator.pop(context);
+
+                    // Show success message
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Profile updated successfully!'),
+                          backgroundColor: Colors.green,
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    // Close loading dialog
+                    if (mounted) Navigator.pop(context);
+
+                    print('Error updating profile: $e');
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Error updating profile: $e'),
+                          backgroundColor: Colors.red,
+                          duration: const Duration(seconds: 3),
+                        ),
+                      );
+                    }
                   }
-
-                  await FirebaseFirestore.instance
-                      .collection('count')
-                      .doc(uid)
-                      .update({
-                    'first_name': updatedFirstName,
-                    'last_name': updatedLastName,
-                    'bio': bio,
-                  });
-                  Navigator.pop(context);
                 },
                 child: const Text("Save"),
               ),
@@ -569,7 +624,20 @@ class _ProfilePageState extends State<ProfilePage> {
                     const SizedBox(height: 30),
 
                     // History
-                    _buildSectionTitle("History"),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        _buildSectionTitle("History"),
+                        TextButton.icon(
+                          onPressed: _clearAllHistory,
+                          icon: const Icon(Icons.delete_sweep, size: 18),
+                          label: const Text('Clear All'),
+                          style: TextButton.styleFrom(
+                            foregroundColor: Colors.red,
+                          ),
+                        ),
+                      ],
+                    ),
                     _buildHistorySection(),
 
                     const SizedBox(height: 30),
@@ -602,6 +670,42 @@ class _ProfilePageState extends State<ProfilePage> {
         style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
       ),
     );
+  }
+
+  /// Show confirmation dialog and clear all history
+  Future<void> _clearAllHistory() async {
+    final shouldClear = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Clear All History'),
+        content: const Text(
+          'Are you sure you want to clear your entire watch history? This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Clear All'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldClear == true) {
+      await _historyService.clearHistory();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Watch history cleared'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    }
   }
 
   // History section with functional video playback
@@ -656,6 +760,7 @@ class _ProfilePageState extends State<ProfilePage> {
     final String title = video['title'] ?? "Untitled";
     final String thumbnailUrl = video['thumbnailUrl'] ?? "";
     final String videoType = video['videoType'] ?? 'uploaded';
+    final String videoId = video['videoId'] ?? "";
 
     return GestureDetector(
       onTap: () {
@@ -663,6 +768,39 @@ class _ProfilePageState extends State<ProfilePage> {
           _playYouTubeVideo(video);
         } else {
           _playUploadedVideo(video);
+        }
+      },
+      onLongPress: () async {
+        // Show delete confirmation on long press
+        final shouldDelete = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Remove from History'),
+            content: Text('Remove "$title" from your watch history?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: TextButton.styleFrom(foregroundColor: Colors.red),
+                child: const Text('Remove'),
+              ),
+            ],
+          ),
+        );
+
+        if (shouldDelete == true && videoId.isNotEmpty) {
+          await _historyService.removeFromHistory(videoId);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Removed from history'),
+                duration: Duration(seconds: 2),
+              ),
+            );
+          }
         }
       },
       child: Container(
@@ -724,6 +862,58 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
               ],
             ),
+            // Delete button overlay
+            Positioned(
+              top: 4,
+              right: 4,
+              child: GestureDetector(
+                onTap: () async {
+                  final shouldDelete = await showDialog<bool>(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text('Remove from History'),
+                      content: Text('Remove "$title" from your watch history?'),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, false),
+                          child: const Text('Cancel'),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, true),
+                          style:
+                              TextButton.styleFrom(foregroundColor: Colors.red),
+                          child: const Text('Remove'),
+                        ),
+                      ],
+                    ),
+                  );
+
+                  if (shouldDelete == true && videoId.isNotEmpty) {
+                    await _historyService.removeFromHistory(videoId);
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Removed from history'),
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                    }
+                  }
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.6),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.close,
+                    size: 16,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -755,6 +945,7 @@ class _ProfilePageState extends State<ProfilePage> {
     final String videoId = video['videoId'] ?? '';
     final String videoUrl = video['videoUrl'] ?? '';
     final String title = video['title'] ?? 'Untitled';
+    final String thumbnailUrl = video['thumbnailUrl'] ?? '';
 
     if (videoUrl.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -782,6 +973,7 @@ class _ProfilePageState extends State<ProfilePage> {
           firstName: video['firstName'] ?? '',
           lastName: video['lastName'] ?? '',
           videoId: videoId,
+          thumbnailUrl: thumbnailUrl,
         ),
       ),
     );

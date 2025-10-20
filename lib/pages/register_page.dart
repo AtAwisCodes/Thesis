@@ -22,6 +22,36 @@ class _RegisterPageState extends State<RegisterPage> {
   final firstNameController = TextEditingController();
   final ageController = TextEditingController();
 
+  // Password validation state
+  bool hasMinLength = false;
+  bool hasUppercase = false;
+  bool hasLowercase = false;
+  bool hasNumber = false;
+  bool hasSpecialChar = false;
+  bool passwordsMatch = false;
+  bool showPasswordRequirements = false;
+
+  @override
+  void initState() {
+    super.initState();
+    passwordController.addListener(_validatePassword);
+    confirmPasswordController.addListener(_validatePassword);
+  }
+
+  void _validatePassword() {
+    setState(() {
+      final password = passwordController.text;
+      hasMinLength = password.length >= 8;
+      hasUppercase = RegExp(r'[A-Z]').hasMatch(password);
+      hasLowercase = RegExp(r'[a-z]').hasMatch(password);
+      hasNumber = RegExp(r'\d').hasMatch(password);
+      hasSpecialChar = RegExp(r'[^\w\s]').hasMatch(password);
+      passwordsMatch =
+          password.isNotEmpty && password == confirmPasswordController.text;
+      showPasswordRequirements = password.isNotEmpty;
+    });
+  }
+
   @override
   void dispose() {
     emailController.dispose();
@@ -65,28 +95,13 @@ class _RegisterPageState extends State<RegisterPage> {
       return;
     }
 
-    // Check password requirements individually
-    List<String> missing = [];
-    if (password.length < 8) {
-      missing.add("At least 8 characters,");
-    }
-    if (!RegExp(r'[A-Z]').hasMatch(password)) {
-      missing.add("At least one uppercase letter,");
-    }
-    if (!RegExp(r'[a-z]').hasMatch(password)) {
-      missing.add("At least one lowercase letter,");
-    }
-    if (!RegExp(r'\d').hasMatch(password)) {
-      missing.add("At least one number,");
-    }
-    if (!RegExp(r'[^\w\s]').hasMatch(password)) {
-      missing.add("At least one special character");
-    }
-
-    if (missing.isNotEmpty) {
-      showErrorMessage(
-        "${missing.join("\n")}",
-      );
+    // Check password requirements
+    if (!hasMinLength ||
+        !hasUppercase ||
+        !hasLowercase ||
+        !hasNumber ||
+        !hasSpecialChar) {
+      showErrorMessage("Please meet all password requirements.");
       return;
     }
 
@@ -268,12 +283,20 @@ class _RegisterPageState extends State<RegisterPage> {
                   hintText: 'Password',
                   obscureText: true,
                 ),
+                if (showPasswordRequirements) ...[
+                  SizedBox(height: screenHeight * 0.01),
+                  _buildPasswordRequirements(textSize),
+                ],
                 SizedBox(height: screenHeight * 0.015),
                 MyTextfield(
                   controller: confirmPasswordController,
                   hintText: 'Confirm Password',
                   obscureText: true,
                 ),
+                if (confirmPasswordController.text.isNotEmpty) ...[
+                  SizedBox(height: screenHeight * 0.01),
+                  _buildPasswordMatchIndicator(textSize),
+                ],
                 SizedBox(height: screenHeight * 0.02),
                 MyButton(
                   text: "Create Account",
@@ -366,6 +389,94 @@ class _RegisterPageState extends State<RegisterPage> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+//PASSWORD VALIDATOR BOX
+  Widget _buildPasswordRequirements(double textSize) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xff1E2330),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey.withOpacity(0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Password Requirements:',
+            style: TextStyle(
+              color: Colors.grey[400],
+              fontSize: textSize * 0.9,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          _buildRequirementItem(
+              'At least 8 characters', hasMinLength, textSize),
+          _buildRequirementItem('One uppercase letter', hasUppercase, textSize),
+          _buildRequirementItem('One lowercase letter', hasLowercase, textSize),
+          _buildRequirementItem('One number', hasNumber, textSize),
+          _buildRequirementItem(
+              'One special character', hasSpecialChar, textSize),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRequirementItem(String text, bool isMet, double textSize) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Icon(
+            isMet ? Icons.check_circle : Icons.cancel,
+            color: isMet ? Colors.green : Colors.grey,
+            size: textSize * 1.2,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            text,
+            style: TextStyle(
+              color: isMet ? Colors.green : Colors.grey[400],
+              fontSize: textSize * 0.85,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPasswordMatchIndicator(double textSize) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xff1E2330),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: passwordsMatch
+              ? Colors.green.withOpacity(0.5)
+              : Colors.red.withOpacity(0.5),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            passwordsMatch ? Icons.check_circle : Icons.cancel,
+            color: passwordsMatch ? Colors.green : Colors.red,
+            size: textSize * 1.2,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            passwordsMatch ? 'Passwords match' : 'Passwords do not match',
+            style: TextStyle(
+              color: passwordsMatch ? Colors.green : Colors.red,
+              fontSize: textSize * 0.85,
+            ),
+          ),
+        ],
       ),
     );
   }

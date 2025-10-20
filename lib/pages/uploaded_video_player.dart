@@ -7,6 +7,7 @@ import 'package:rexplore/services/upload_function.dart';
 import 'package:rexplore/services/follow_service.dart';
 import 'package:rexplore/services/notification_service.dart';
 import 'package:rexplore/services/video_history_service.dart';
+import 'package:rexplore/services/user_profile_sync_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -18,6 +19,7 @@ class UploadedVideoPlayer extends StatefulWidget {
   final String avatarUrl;
   final String firstName;
   final String lastName;
+  final String thumbnailUrl;
 
   const UploadedVideoPlayer({
     super.key,
@@ -28,6 +30,7 @@ class UploadedVideoPlayer extends StatefulWidget {
     required this.avatarUrl,
     required this.firstName,
     required this.lastName,
+    this.thumbnailUrl = '',
   });
 
   @override
@@ -42,6 +45,7 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
   final FollowService _followService = FollowService();
   final NotificationService _notificationService = NotificationService();
   final VideoHistoryService _historyService = VideoHistoryService();
+  final UserProfileSyncService _profileSyncService = UserProfileSyncService();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
@@ -75,7 +79,7 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
       });
 
     // Load initial liked state
-    isLiked = FavoritesManager.instance.contains(widget.videoUrl);
+    isLiked = FavoritesManager.instance.contains(widget.videoId);
 
     // Add video to watch history
     _addToHistory();
@@ -125,7 +129,7 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
       videoId: widget.videoId,
       videoUrl: widget.videoUrl,
       title: widget.title,
-      thumbnailUrl: '', // Will be fetched from Firestore if needed
+      thumbnailUrl: widget.thumbnailUrl,
       uploadedAt: widget.uploadedAt,
       avatarUrl: widget.avatarUrl,
       firstName: widget.firstName,
@@ -499,10 +503,17 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
 
   Future<void> _toggleLikeAndFavorite() async {
     final videoData = {
-      "id": widget.videoUrl,
+      "id": widget.videoId, // Use videoId instead of videoUrl
+      "videoId": widget.videoId,
       "title": widget.title,
       "url": widget.videoUrl,
+      "publicUrl": widget.videoUrl,
       "uploadedAt": widget.uploadedAt,
+      "thumbnailUrl": widget.thumbnailUrl,
+      "avatarUrl": widget.avatarUrl,
+      "firstName": widget.firstName,
+      "lastName": widget.lastName,
+      "views": _viewCount,
     };
 
     setState(() {
@@ -511,7 +522,7 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
         isDisliked = false; // clear dislike
         FavoritesManager.instance.addFavorite(videoData);
       } else {
-        FavoritesManager.instance.removeFavorite(widget.videoUrl);
+        FavoritesManager.instance.removeFavorite(widget.videoId);
       }
     });
 
@@ -856,248 +867,273 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
 
   @override
   Widget build(BuildContext context) {
-    final uploaderName = "${widget.firstName} ${widget.lastName}".trim();
-
     return Scaffold(
       appBar: AppBar(
         elevation: 0,
         backgroundColor: Colors.transparent,
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            // Video Player
-            SizedBox(
-              height: 280,
-              width: double.infinity,
-              child: _controller.value.isInitialized
-                  ? Stack(
-                      alignment: Alignment.bottomCenter,
-                      children: [
-                        GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              _controller.value.isPlaying
-                                  ? _controller.pause()
-                                  : _controller.play();
-                            });
-                          },
-                          child: AspectRatio(
-                            aspectRatio: _controller.value.aspectRatio,
-                            child: VideoPlayer(_controller),
-                          ),
-                        ),
-                        VideoProgressIndicator(
-                          _controller,
-                          allowScrubbing: true,
-                          padding: const EdgeInsets.all(8.0),
-                          colors: const VideoProgressColors(
-                            playedColor: Colors.red,
-                            bufferedColor: Colors.grey,
-                            backgroundColor: Colors.black26,
-                          ),
-                        ),
-                        Positioned(
-                          right: 5,
-                          bottom: 5,
-                          child: IconButton(
-                            icon: const Icon(Icons.fullscreen,
-                                color: Colors.blueGrey),
-                            onPressed: _enterFullscreen,
-                          ),
-                        ),
-                      ],
-                    )
-                  : const Center(child: CircularProgressIndicator()),
-            ),
+      body: StreamBuilder<Map<String, dynamic>?>(
+        stream: _uploaderUserId != null
+            ? _profileSyncService.getUserProfileStream(_uploaderUserId!)
+            : Stream.value(null),
+        builder: (context, profileSnapshot) {
+          // Use real-time data if available, otherwise use widget data
+          final firstName =
+              profileSnapshot.hasData && profileSnapshot.data != null
+                  ? (profileSnapshot.data!['first_name'] ?? widget.firstName)
+                  : widget.firstName;
+          final lastName =
+              profileSnapshot.hasData && profileSnapshot.data != null
+                  ? (profileSnapshot.data!['last_name'] ?? widget.lastName)
+                  : widget.lastName;
+          final avatarUrl =
+              profileSnapshot.hasData && profileSnapshot.data != null
+                  ? (profileSnapshot.data!['avatar_url'] ?? widget.avatarUrl)
+                  : widget.avatarUrl;
 
-            // Title
-            Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    widget.title,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  // View counts
-                  Row(
+          final uploaderName = "$firstName $lastName".trim();
+
+          return SingleChildScrollView(
+            child: Column(
+              children: [
+                // Video Player
+                SizedBox(
+                  height: 280,
+                  width: double.infinity,
+                  child: _controller.value.isInitialized
+                      ? Stack(
+                          alignment: Alignment.bottomCenter,
+                          children: [
+                            GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  _controller.value.isPlaying
+                                      ? _controller.pause()
+                                      : _controller.play();
+                                });
+                              },
+                              child: AspectRatio(
+                                aspectRatio: _controller.value.aspectRatio,
+                                child: VideoPlayer(_controller),
+                              ),
+                            ),
+                            VideoProgressIndicator(
+                              _controller,
+                              allowScrubbing: true,
+                              padding: const EdgeInsets.all(8.0),
+                              colors: const VideoProgressColors(
+                                playedColor: Colors.red,
+                                bufferedColor: Colors.grey,
+                                backgroundColor: Colors.black26,
+                              ),
+                            ),
+                            Positioned(
+                              right: 5,
+                              bottom: 5,
+                              child: IconButton(
+                                icon: const Icon(Icons.fullscreen,
+                                    color: Colors.blueGrey),
+                                onPressed: _enterFullscreen,
+                              ),
+                            ),
+                          ],
+                        )
+                      : const Center(child: CircularProgressIndicator()),
+                ),
+
+                // Title
+                Padding(
+                  padding: const EdgeInsets.all(12.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const SizedBox(width: 6),
                       Text(
-                        '$_viewCount ${_viewCount == 1 ? 'view' : 'views'}',
+                        widget.title,
                         style: const TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey,
-                          fontWeight: FontWeight.w500,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
                         ),
+                      ),
+                      const SizedBox(height: 6),
+                      // View counts
+                      Row(
+                        children: [
+                          const SizedBox(width: 6),
+                          Text(
+                            '$_viewCount ${_viewCount == 1 ? 'view' : 'views'}',
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                ],
-              ),
-            ),
+                ),
 
-            // Uploader Avatar + Name + Actions
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  // Uploader info
-                  Row(
+                // Uploader Avatar + Name + Actions
+                Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      CircleAvatar(
-                        radius: 20,
-                        backgroundImage: widget.avatarUrl.isNotEmpty
-                            ? NetworkImage(widget.avatarUrl)
-                            : null,
-                        child: widget.avatarUrl.isEmpty
-                            ? const Icon(Icons.person)
-                            : null,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        uploaderName.isNotEmpty ? uploaderName : "Anonymous",
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  // Like / Dislike / Follow
-                  Row(
-                    children: [
-                      IconButton(
-                        icon: Icon(
-                          Icons.thumb_up,
-                          color: isLiked ? Colors.green : Colors.grey,
-                        ),
-                        onPressed: _toggleLikeAndFavorite,
-                      ),
-                      IconButton(
-                        icon: Icon(
-                          Icons.thumb_down,
-                          color: isDisliked ? Colors.red : Colors.grey,
-                        ),
-                        onPressed: () {
-                          setState(() {
-                            isDisliked = !isDisliked;
-                            if (isDisliked) isLiked = false;
-                          });
-                        },
-                      ),
-                      const SizedBox(width: 10),
-                      SizedBox(
-                        width: 90,
-                        height: 36,
-                        child: ElevatedButton(
-                          onPressed: _toggleFollow,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: isFollowed
-                                ? Colors.grey
-                                : const Color(0xff5BEC84),
-                            padding: EdgeInsets.zero,
+                      // Uploader info with real-time data
+                      Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 20,
+                            backgroundImage: avatarUrl.isNotEmpty
+                                ? NetworkImage(avatarUrl)
+                                : null,
+                            child: avatarUrl.isEmpty
+                                ? const Icon(Icons.person)
+                                : null,
                           ),
-                          child: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            child: Text(
-                              isFollowed ? "Followed" : "Follow",
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color:
-                                    isFollowed ? Colors.white70 : Colors.black,
+                          const SizedBox(width: 8),
+                          Text(
+                            uploaderName.isNotEmpty
+                                ? uploaderName
+                                : "Anonymous",
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      // Like / Dislike / Follow
+                      Row(
+                        children: [
+                          IconButton(
+                            icon: Icon(
+                              Icons.thumb_up,
+                              color: isLiked ? Colors.green : Colors.grey,
+                            ),
+                            onPressed: _toggleLikeAndFavorite,
+                          ),
+                          IconButton(
+                            icon: Icon(
+                              Icons.thumb_down,
+                              color: isDisliked ? Colors.red : Colors.grey,
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                isDisliked = !isDisliked;
+                                if (isDisliked) isLiked = false;
+                              });
+                            },
+                          ),
+                          const SizedBox(width: 10),
+                          SizedBox(
+                            width: 90,
+                            height: 36,
+                            child: ElevatedButton(
+                              onPressed: _toggleFollow,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: isFollowed
+                                    ? Colors.grey
+                                    : const Color(0xff5BEC84),
+                                padding: EdgeInsets.zero,
+                              ),
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  isFollowed ? "Followed" : "Follow",
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: isFollowed
+                                        ? Colors.white70
+                                        : Colors.black,
+                                  ),
+                                ),
                               ),
                             ),
                           ),
-                        ),
+                        ],
                       ),
                     ],
                   ),
-                ],
-              ),
-            ),
-
-            // comments trigger
-            GestureDetector(
-              onTap: () {
-                if (widget.videoId.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Comments cannot be loaded.'),
-                      backgroundColor: Colors.red,
-                      duration: Duration(seconds: 3),
-                    ),
-                  );
-                  return;
-                }
-                _openComments(context);
-              },
-              child: Container(
-                height: 50,
-                width: MediaQuery.of(context).size.width * 0.97,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                alignment: Alignment.centerLeft,
-                decoration: BoxDecoration(
-                  border: Border.all(
-                    color: widget.videoId.isEmpty ? Colors.red : Colors.grey,
-                    width: widget.videoId.isEmpty ? 2 : 1,
-                  ),
-                  borderRadius: BorderRadius.circular(12),
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        if (widget.videoId.isEmpty)
-                          const Padding(
-                            padding: EdgeInsets.only(right: 8),
-                            child: Icon(Icons.warning,
-                                color: Colors.red, size: 20),
-                          ),
-                        Text(
-                          widget.videoId.isEmpty
-                              ? "Comments (missing something)"
-                              : "Comments...",
-                          style: TextStyle(
-                            color: widget.videoId.isEmpty
-                                ? Colors.red
-                                : Theme.of(context).hintColor,
-                          ),
+
+                // comments trigger
+                GestureDetector(
+                  onTap: () {
+                    if (widget.videoId.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Comments cannot be loaded.'),
+                          backgroundColor: Colors.red,
+                          duration: Duration(seconds: 3),
                         ),
+                      );
+                      return;
+                    }
+                    _openComments(context);
+                  },
+                  child: Container(
+                    height: 50,
+                    width: MediaQuery.of(context).size.width * 0.97,
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    alignment: Alignment.centerLeft,
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color:
+                            widget.videoId.isEmpty ? Colors.red : Colors.grey,
+                        width: widget.videoId.isEmpty ? 2 : 1,
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            if (widget.videoId.isEmpty)
+                              const Padding(
+                                padding: EdgeInsets.only(right: 8),
+                                child: Icon(Icons.warning,
+                                    color: Colors.red, size: 20),
+                              ),
+                            Text(
+                              widget.videoId.isEmpty
+                                  ? "Comments (missing something)"
+                                  : "Comments...",
+                              style: TextStyle(
+                                color: widget.videoId.isEmpty
+                                    ? Colors.red
+                                    : Theme.of(context).hintColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (comments.isNotEmpty)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.green,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              '${comments.length}',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
                       ],
                     ),
-                    if (comments.isNotEmpty)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.green,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          '${comments.length}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ),
-                  ],
+                  ),
                 ),
-              ),
+              ],
             ),
-          ],
-        ),
+          );
+        },
       ),
 
       // Updated Floating Action Button with Model Status

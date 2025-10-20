@@ -9,23 +9,32 @@ class FavoritesManager extends ChangeNotifier {
   }
   static final FavoritesManager instance = FavoritesManager._internal();
 
-  final List<Map<String, String>> _favorites = [];
+  final List<Map<String, dynamic>> _favorites = [];
   final _firestore = FirebaseFirestore.instance;
   final _auth = FirebaseAuth.instance;
 
   StreamSubscription<DocumentSnapshot>? _favoritesSub;
 
-  List<Map<String, String>> get favorites => List.unmodifiable(_favorites);
+  // Maximum number of favorites allowed
+  static const int maxFavorites = 50;
+
+  List<Map<String, dynamic>> get favorites => List.unmodifiable(_favorites);
 
   bool contains(String id) => _favorites.any((v) => v['id'] == id);
 
   /// Add a video to favorites
-  Future<void> addFavorite(Map<String, String> video) async {
+  Future<void> addFavorite(Map<String, dynamic> video) async {
     final user = _auth.currentUser;
     if (user == null || video['id'] == null) return;
 
     if (!contains(video['id']!)) {
-      _favorites.insert(0, Map<String, String>.from(video));
+      _favorites.insert(0, Map<String, dynamic>.from(video));
+
+      // Enforce limit: remove oldest if exceeding max
+      if (_favorites.length > maxFavorites) {
+        _favorites.removeLast();
+      }
+
       notifyListeners();
 
       await _firestore.collection('favorites').doc(user.uid).set({
@@ -72,7 +81,7 @@ class FavoritesManager extends ChangeNotifier {
         final List<dynamic> fromCloud = data['videos'] ?? [];
         _favorites
           ..clear()
-          ..addAll(fromCloud.map((e) => Map<String, String>.from(e)));
+          ..addAll(fromCloud.map((e) => Map<String, dynamic>.from(e)));
       } else {
         _favorites.clear();
       }

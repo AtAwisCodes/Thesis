@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:rexplore/services/favorites_manager.dart';
+import 'package:rexplore/services/user_profile_sync_service.dart';
 import 'package:rexplore/pages/yt_video_player.dart';
 import 'package:rexplore/pages/uploaded_video_player.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -15,6 +16,7 @@ class FavoritePage extends StatefulWidget {
 
 class _FavoritePageState extends State<FavoritePage> {
   final FavoritesManager _manager = FavoritesManager.instance;
+  final UserProfileSyncService _profileSyncService = UserProfileSyncService();
 
   @override
   Widget build(BuildContext context) {
@@ -130,17 +132,15 @@ class _FavoritePageState extends State<FavoritePage> {
     );
   }
 
-  /// Uploaded video card
+  /// Uploaded video card with real-time user data
   Widget _uploadedVideoCard(Map<String, dynamic> video) {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
 
-    final videoId = video["id"] ?? "";
+    final videoId = video["videoId"] ?? video["id"] ?? "";
     final videoUrl = video["publicUrl"] ?? video["url"] ?? "";
     final title = video["title"] ?? "Untitled";
-    final firstName = video["firstName"] as String? ?? "";
-    final lastName = video["lastName"] as String? ?? "";
-    final avatarUrl = video["avatarUrl"] as String? ?? "";
+    final userId = video["userId"] ?? "";
     final thumbnailUrl = video["thumbnailUrl"] ?? "";
     final views = video["views"] ?? 0;
 
@@ -149,156 +149,182 @@ class _FavoritePageState extends State<FavoritePage> {
     if (video["uploadedAt"] is Timestamp) {
       final date = (video["uploadedAt"] as Timestamp).toDate();
       uploadedAtText = DateFormat("MMM d, yyyy").format(date);
+    } else if (video["uploadedAt"] is String) {
+      uploadedAtText = video["uploadedAt"];
     }
 
-    return GestureDetector(
-      onTap: () {
-        if (videoUrl.isEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Video URL is missing")),
-          );
-          return;
-        }
+    // Get real-time user profile data
+    return StreamBuilder<Map<String, dynamic>?>(
+      stream: userId.isNotEmpty
+          ? _profileSyncService.getUserProfileStream(userId)
+          : Stream.value(null),
+      builder: (context, profileSnapshot) {
+        // Use real-time data if available, otherwise fallback to video data
+        final firstName = profileSnapshot.hasData &&
+                profileSnapshot.data != null
+            ? (profileSnapshot.data!['first_name'] ?? video["firstName"] ?? "")
+            : (video["firstName"] ?? "");
+        final lastName = profileSnapshot.hasData && profileSnapshot.data != null
+            ? (profileSnapshot.data!['last_name'] ?? video["lastName"] ?? "")
+            : (video["lastName"] ?? "");
+        final avatarUrl = profileSnapshot.hasData &&
+                profileSnapshot.data != null
+            ? (profileSnapshot.data!['avatar_url'] ?? video["avatarUrl"] ?? "")
+            : (video["avatarUrl"] ?? "");
 
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => UploadedVideoPlayer(
-              videoUrl: videoUrl,
-              title: title,
-              uploadedAt: uploadedAtText,
-              avatarUrl: avatarUrl,
-              firstName: firstName,
-              lastName: lastName,
-              videoId: videoId,
+        return GestureDetector(
+          onTap: () {
+            if (videoUrl.isEmpty) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text("Video URL is missing")),
+              );
+              return;
+            }
+
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => UploadedVideoPlayer(
+                  videoUrl: videoUrl,
+                  title: title,
+                  uploadedAt: uploadedAtText,
+                  avatarUrl: avatarUrl,
+                  firstName: firstName,
+                  lastName: lastName,
+                  videoId: videoId,
+                  thumbnailUrl: thumbnailUrl,
+                ),
+              ),
+            );
+          },
+          child: Container(
+            margin: EdgeInsets.symmetric(
+              horizontal: screenWidth * 0.04,
+              vertical: screenHeight * 0.01,
             ),
-          ),
-        );
-      },
-      child: Container(
-        margin: EdgeInsets.symmetric(
-          horizontal: screenWidth * 0.04,
-          vertical: screenHeight * 0.01,
-        ),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          color: Colors.grey[900],
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.4),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              color: Colors.grey[900],
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.4),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Thumbnail with play icon overlay
-            Stack(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                ClipRRect(
-                  borderRadius:
-                      const BorderRadius.vertical(top: Radius.circular(16)),
-                  child: thumbnailUrl.isNotEmpty
-                      ? Image.network(
-                          thumbnailUrl,
-                          width: double.infinity,
-                          height: screenHeight * 0.23,
-                          fit: BoxFit.cover,
-                        )
-                      : Container(
-                          width: double.infinity,
-                          height: screenHeight * 0.23,
-                          color: Colors.black,
+                // Thumbnail with play icon overlay
+                Stack(
+                  children: [
+                    ClipRRect(
+                      borderRadius:
+                          const BorderRadius.vertical(top: Radius.circular(16)),
+                      child: thumbnailUrl.isNotEmpty
+                          ? Image.network(
+                              thumbnailUrl,
+                              width: double.infinity,
+                              height: screenHeight * 0.23,
+                              fit: BoxFit.cover,
+                            )
+                          : Container(
+                              width: double.infinity,
+                              height: screenHeight * 0.23,
+                              color: Colors.black,
+                            ),
+                    ),
+
+                    // Play button overlay
+                    Positioned.fill(
+                      child: Align(
+                        alignment: Alignment.center,
+                        child: Icon(
+                          Icons.play_circle_fill,
+                          color: Colors.white.withOpacity(0.9),
+                          size: screenWidth * 0.18,
                         ),
+                      ),
+                    ),
+                  ],
                 ),
 
-                // Play button overlay
-                Positioned.fill(
-                  child: Align(
-                    alignment: Alignment.center,
-                    child: Icon(
-                      Icons.play_circle_fill,
-                      color: Colors.white.withOpacity(0.9),
-                      size: screenWidth * 0.18,
-                    ),
+                // Video Details
+                Padding(
+                  padding: EdgeInsets.all(screenWidth * 0.03),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Title
+                      Text(
+                        title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          fontSize: screenWidth * 0.045,
+                        ),
+                      ),
+
+                      SizedBox(height: screenHeight * 0.008),
+
+                      // Uploader + Views + Favorite Button
+                      Row(
+                        children: [
+                          CircleAvatar(
+                            radius: screenWidth * 0.04,
+                            backgroundColor: Colors.grey[700],
+                            backgroundImage: avatarUrl.isNotEmpty
+                                ? NetworkImage(avatarUrl)
+                                : null,
+                            child: avatarUrl.isEmpty
+                                ? const Icon(Icons.person,
+                                    color: Colors.white70)
+                                : null,
+                          ),
+                          SizedBox(width: screenWidth * 0.025),
+                          Expanded(
+                            child: Text(
+                              "$firstName $lastName",
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: screenWidth * 0.035,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          Icon(Icons.visibility,
+                              size: 16, color: Colors.white54),
+                          const SizedBox(width: 4),
+                          Text(
+                            "$views",
+                            style: TextStyle(
+                              color: Colors.white54,
+                              fontSize: screenWidth * 0.032,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          IconButton(
+                            icon: const Icon(Icons.favorite,
+                                color: Colors.redAccent),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                            onPressed: () {
+                              FavoritesManager.instance.removeFavorite(videoId);
+                            },
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
-
-            // Video Details
-            Padding(
-              padding: EdgeInsets.all(screenWidth * 0.03),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Title
-                  Text(
-                    title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                      fontSize: screenWidth * 0.045,
-                    ),
-                  ),
-
-                  SizedBox(height: screenHeight * 0.008),
-
-                  // Uploader + Views + Favorite Button
-                  Row(
-                    children: [
-                      CircleAvatar(
-                        radius: screenWidth * 0.04,
-                        backgroundColor: Colors.grey[700],
-                        backgroundImage: avatarUrl.isNotEmpty
-                            ? NetworkImage(avatarUrl)
-                            : null,
-                        child: avatarUrl.isEmpty
-                            ? const Icon(Icons.person, color: Colors.white70)
-                            : null,
-                      ),
-                      SizedBox(width: screenWidth * 0.025),
-                      Expanded(
-                        child: Text(
-                          "$firstName $lastName",
-                          style: TextStyle(
-                            color: Colors.white70,
-                            fontSize: screenWidth * 0.035,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      Icon(Icons.visibility, size: 16, color: Colors.white54),
-                      const SizedBox(width: 4),
-                      Text(
-                        "$views",
-                        style: TextStyle(
-                          color: Colors.white54,
-                          fontSize: screenWidth * 0.032,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      IconButton(
-                        icon:
-                            const Icon(Icons.favorite, color: Colors.redAccent),
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                        onPressed: () {
-                          FavoritesManager.instance.removeFavorite(videoId);
-                        },
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }

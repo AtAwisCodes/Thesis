@@ -80,6 +80,7 @@ class NotifPage extends StatelessWidget {
                   firstName: data['firstName'] ?? '',
                   lastName: data['lastName'] ?? '',
                   videoId: videoId,
+                  thumbnailUrl: data['thumbnailUrl'] ?? '',
                 ),
               ),
             );
