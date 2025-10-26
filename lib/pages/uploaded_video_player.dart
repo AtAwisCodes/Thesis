@@ -58,6 +58,7 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
   bool _isLoadingComments = true;
   int _viewCount = 0;
   String? _uploaderUserId;
+  bool _showPlayPauseButton = false;
 
   @override
   void initState() {
@@ -896,43 +897,84 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
           return SingleChildScrollView(
             child: Column(
               children: [
-                // Video Player
-                SizedBox(
-                  height: 280,
+                // Video Player with fixed container
+                Container(
+                  height: 250,
                   width: double.infinity,
+                  color: Colors.black,
                   child: _controller.value.isInitialized
                       ? Stack(
-                          alignment: Alignment.bottomCenter,
+                          alignment: Alignment.center,
                           children: [
                             GestureDetector(
                               onTap: () {
                                 setState(() {
-                                  _controller.value.isPlaying
-                                      ? _controller.pause()
-                                      : _controller.play();
+                                  if (_controller.value.isPlaying) {
+                                    _controller.pause();
+                                  } else {
+                                    _controller.play();
+                                  }
+                                  _showPlayPauseButton = true;
+                                });
+
+                                // Hide the button after 1 second
+                                Future.delayed(const Duration(seconds: 1), () {
+                                  if (mounted) {
+                                    setState(() {
+                                      _showPlayPauseButton = false;
+                                    });
+                                  }
                                 });
                               },
-                              child: AspectRatio(
-                                aspectRatio: _controller.value.aspectRatio,
-                                child: VideoPlayer(_controller),
-                              ),
+                              child: _controller.value.aspectRatio > 1
+                                  ? // Landscape video - fill the space
+                                  SizedBox.expand(
+                                      child: FittedBox(
+                                        fit: BoxFit.cover,
+                                        child: SizedBox(
+                                          width: _controller.value.size.width,
+                                          height: _controller.value.size.height,
+                                          child: VideoPlayer(_controller),
+                                        ),
+                                      ),
+                                    )
+                                  : Center(
+                                      child: AspectRatio(
+                                        aspectRatio:
+                                            _controller.value.aspectRatio,
+                                        child: VideoPlayer(_controller),
+                                      ),
+                                    ),
                             ),
-                            VideoProgressIndicator(
-                              _controller,
-                              allowScrubbing: true,
-                              padding: const EdgeInsets.all(8.0),
-                              colors: const VideoProgressColors(
-                                playedColor: Colors.red,
-                                bufferedColor: Colors.grey,
-                                backgroundColor: Colors.black26,
+                            // Play/Pause button overlay
+                            if (_showPlayPauseButton)
+                              Center(
+                                child: AnimatedOpacity(
+                                  opacity: _showPlayPauseButton ? 1.0 : 0.0,
+                                  duration: const Duration(milliseconds: 300),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(20),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black.withOpacity(0.6),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Icon(
+                                      _controller.value.isPlaying
+                                          ? Icons.pause
+                                          : Icons.play_arrow,
+                                      size: 50,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
                               ),
-                            ),
+                            // Fullscreen button
                             Positioned(
-                              right: 5,
-                              bottom: 5,
+                              bottom: 10,
+                              right: 10,
                               child: IconButton(
                                 icon: const Icon(Icons.fullscreen,
-                                    color: Colors.blueGrey),
+                                    color: Colors.white),
                                 onPressed: _enterFullscreen,
                               ),
                             ),

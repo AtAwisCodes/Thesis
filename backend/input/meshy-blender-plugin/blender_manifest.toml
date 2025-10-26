@@ -1,0 +1,26 @@
+schema_version = "0.5.5"
+
+id = "meshy"
+blender_version_min = "4.2.0"
+version = "0.5.5"
+name = "Meshy official plugin"
+tagline = "Browse assets and Text to texture"
+maintainer = "Meshy <support@meshy.ai>"
+type = "add-on"
+
+website = "https://www.meshy.ai/api"
+
+tags = ["Mesh", "Object"]
+
+
+license = [
+  "SPDX:GPL-3.0-or-later",
+]
+
+copyright = [
+  "2025 MeshyAI",
+]
+
+[permissions]
+network = "Interact with Meshy servers"
+files = "Save and load assets"

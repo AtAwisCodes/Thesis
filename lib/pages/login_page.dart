@@ -4,6 +4,7 @@ import 'package:rexplore/components/my_button.dart';
 import 'package:rexplore/components/my_textfield.dart';
 import 'package:rexplore/components/square_tile.dart';
 import 'package:rexplore/services/auth_service.dart';
+import 'package:rexplore/utilities/disposable_email_checker.dart';
 
 class LoginPage extends StatefulWidget {
   final Function()? onTap;
@@ -18,11 +19,38 @@ class _LoginPageState extends State<LoginPage> {
   final passwordController = TextEditingController();
 
   void signInUser() async {
+    // Check for disposable email
+    final emailText = emailController.text.trim();
+    if (emailText.isEmpty) {
+      showErrorMessage("Please enter an email address");
+      return;
+    }
+
+    final isDisposable = await DisposableEmailChecker.isDisposable(emailText);
+    if (isDisposable) {
+      showErrorMessage(
+          "Disposable email addresses are not allowed. Please use a permanent email address.");
+      return;
+    }
+
     try {
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: emailController.text.trim(),
+      UserCredential userCredential =
+          await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: emailText,
         password: passwordController.text.trim(),
       );
+
+      // Check if email is verified
+      if (userCredential.user != null && !userCredential.user!.emailVerified) {
+        // Sign out the user
+        await FirebaseAuth.instance.signOut();
+
+        if (mounted) {
+          showEmailVerificationDialog(userCredential.user!);
+        }
+        return;
+      }
+
       // Close the login dialog - AuthPage StreamBuilder will handle navigation
       if (mounted) {
         Navigator.of(context).pop();
@@ -32,6 +60,123 @@ class _LoginPageState extends State<LoginPage> {
         showErrorMessage("Some information not matched in our system");
       }
     }
+  }
+
+  void showEmailVerificationDialog(User user) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xff2A303E),
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 32),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Email Not Verified',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Please verify your email address before logging in.',
+              style: TextStyle(color: Colors.grey[300], fontSize: 14),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Email sent to:',
+              style: TextStyle(color: Colors.grey[400], fontSize: 12),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              user.email ?? '',
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.orange.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.orange.withOpacity(0.3)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline,
+                      color: Colors.orange, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Check your spam folder if you don\'t see the email.',
+                      style: TextStyle(
+                        color: Colors.grey[300],
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              // Resend verification email
+              try {
+                await user.sendEmailVerification();
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Verification email sent!'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error: ${e.toString()}'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+            child: const Text(
+              'Resend Email',
+              style: TextStyle(color: Colors.blue),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.deepPurple,
+            ),
+            child: const Text(
+              'OK',
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   void showErrorMessage(String message) {
@@ -144,17 +289,6 @@ class _LoginPageState extends State<LoginPage> {
                   obscureText: true,
                 ),
                 SizedBox(height: screenHeight * 0.015),
-
-                // Forgot Password
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: Text(
-                    'Forgot Password?',
-                    style:
-                        TextStyle(color: Colors.grey[600], fontSize: textSize),
-                  ),
-                ),
-                SizedBox(height: screenHeight * 0.02),
 
                 // Sign In Button
                 MyButton(text: "Sign In", onTap: signInUser),

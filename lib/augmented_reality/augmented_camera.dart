@@ -12,7 +12,10 @@ import 'package:ar_flutter_plugin_2/models/ar_anchor.dart';
 import 'package:vector_math/vector_math_64.dart' as vector;
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:rexplore/services/meshy_api_service.dart';
+import 'package:rexplore/services/firestore_model_service.dart';
+import 'package:http/http.dart' as http;
 import 'dart:io';
+import 'package:path_provider/path_provider.dart';
 
 class MeshyARCamera extends StatefulWidget {
   final String? videoId;
@@ -42,6 +45,7 @@ class _MeshyARCameraState extends State<MeshyARCamera> {
   List<Map<String, dynamic>> _availableModels = [];
   String? _selectedModelUrl;
   String? _currentTaskId;
+// Local path to downloaded GLB file
 
   @override
   void initState() {
@@ -50,9 +54,9 @@ class _MeshyARCameraState extends State<MeshyARCamera> {
     _loadAvailableModels();
   }
 
-  // Load available 3D models for this specific video
   Future<void> _loadAvailableModels() async {
     try {
+      debugPrint(" Loading available models...");
       setState(() {
         _isLoadingModel = true;
         _statusMessage = "Loading available 3D models...";
@@ -62,33 +66,45 @@ class _MeshyARCameraState extends State<MeshyARCamera> {
 
       // If videoId is provided, load models specifically for this video
       if (widget.videoId != null) {
-        models = await MeshyApiService.getModelsForVideo(widget.videoId!);
+        debugPrint(" Loading models for video: ${widget.videoId}");
+
+        //NEW: Use Firestore directly - works from any network!
+        models = await FirestoreModelService.getModelsForVideo(widget.videoId!);
 
         // If models exist, automatically select the first/latest one
         if (models.isNotEmpty) {
+          debugPrint("Found ${models.length} models for video");
+          debugPrint("Auto-selecting model: ${models[0]['taskId']}");
+          debugPrint("Model URL: ${models[0]['modelFileUrl']}");
+
           setState(() {
             _availableModels = models;
             _selectedModelUrl = models[0]['modelFileUrl'];
             _isLoadingModel = false;
-            _statusMessage = "✅ Model loaded! Tap screen to place in AR";
+            _statusMessage = "Model loaded! Tap screen to place in AR";
           });
 
-          debugPrint("✅ Auto-selected model: ${models[0]['taskId']}");
-          debugPrint("   Model URL: $_selectedModelUrl");
           return;
+        } else {
+          debugPrint("No models found for video ${widget.videoId}");
         }
       } else {
-        // Otherwise load all available models
-        models = await MeshyApiService.listAllModels();
+        //Otherwise load all available models
+        debugPrint("Loading all available models");
+
+        //NEW: Use Firestore directly - works from any network!
+        models = await FirestoreModelService.listAllModels();
       }
 
       setState(() {
         _availableModels = models;
         _isLoadingModel = false;
         if (_availableModels.isNotEmpty) {
+          debugPrint("Found ${_availableModels.length} total models");
           _statusMessage =
               "${_availableModels.length} models available. Tap icon to select.";
         } else {
+          debugPrint("No models found at all");
           _statusMessage = "No models found. Generate a new one!";
         }
       });
@@ -153,7 +169,6 @@ class _MeshyARCameraState extends State<MeshyARCamera> {
         });
 
         if (status == 'SUCCEEDED') {
-          // Fetch the completed model
           await _fetchGeneratedModel(taskId);
           break;
         } else if (status == 'FAILED' || status == 'CANCELED') {
@@ -247,20 +262,6 @@ Manufacturer: ${androidInfo.manufacturer}
           _statusMessage =
               "Device appears compatible\n\nAttempting to initialize AR...";
         });
-      } else if (Platform.isIOS) {
-        final iosInfo = await deviceInfo.iosInfo;
-
-        setState(() {
-          _deviceInfo = """
-Device: ${iosInfo.name}
-iOS Version: ${iosInfo.systemVersion}
-Model: ${iosInfo.model}
-""";
-          _isCheckingCompatibility = false;
-          _isARSupported = true;
-          _statusMessage =
-              "iOS device detected\n\nAttempting to initialize AR...";
-        });
       }
     } catch (e) {
       debugPrint("Error checking compatibility: $e");
@@ -271,12 +272,6 @@ Model: ${iosInfo.model}
             "Could not verify compatibility\n\nAttempting to initialize AR anyway...";
       });
     }
-  }
-
-  @override
-  void dispose() {
-    arSessionManager?.dispose();
-    super.dispose();
   }
 
   @override
@@ -415,6 +410,19 @@ Model: ${iosInfo.model}
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               SizedBox(height: 16),
+
+              // Clear all models button
+              if (nodes.isNotEmpty)
+                ListTile(
+                  leading: Icon(Icons.clear_all, color: Colors.red),
+                  title: Text('Clear all models'),
+                  subtitle: Text('Remove ${nodes.length} placed models'),
+                  onTap: () async {
+                    await _clearAllModels();
+                    Navigator.pop(context);
+                  },
+                ),
+
               if (_availableModels.isEmpty)
                 ListTile(
                   leading: Icon(Icons.add_circle, color: Colors.green),
@@ -436,11 +444,25 @@ Model: ${iosInfo.model}
                       return ListTile(
                         leading: Icon(Icons.view_in_ar),
                         title: Text(model['taskId'] ?? 'Model ${index + 1}'),
-                        subtitle: Text(model['status'] ?? 'ready'),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(model['status'] ?? 'ready'),
+                            Text(
+                              model['modelFileUrl'] ?? 'No URL',
+                              style:
+                                  TextStyle(fontSize: 10, color: Colors.grey),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
                         onTap: () {
                           setState(() {
                             _selectedModelUrl = model['modelFileUrl'];
-                            _statusMessage = "Model selected. Tap to place!";
+// Reset to force new download
+                            _statusMessage =
+                                "Model selected. Tap screen to place!";
                           });
                           Navigator.pop(context);
                         },
@@ -470,78 +492,343 @@ Model: ${iosInfo.model}
     });
 
     try {
+      debugPrint("🎨 Initializing AR session with enhanced settings...");
       arSessionManager!.onInitialize(
-        showFeaturePoints: false,
+        showFeaturePoints: true,
         showPlanes: true,
-        showWorldOrigin: false,
+        showWorldOrigin: true,
         handleTaps: false,
+        handlePans: true, // Enable pan gestures
+        handleRotation: true, // Enable rotation gestures
       );
 
+      debugPrint(" Initializing AR object manager...");
       arObjectManager!.onInitialize();
+
+      debugPrint(" Setting up tap handler...");
       arSessionManager!.onPlaneOrPointTap = _onPlaneOrPointTapped;
 
+      debugPrint(" Setting up plane detection handler...");
+      arSessionManager!.onPlaneDetected = (planeId) {
+        debugPrint(" Plane detected with ID: $planeId");
+        setState(() {
+          _statusMessage = "Plane detected! Tap to place model.";
+        });
+      };
+
       setState(() {
-        _statusMessage = "AR Session Active\nMove device to detect planes";
+        _statusMessage = " AR Session Active\n Move device to detect planes";
       });
 
-      debugPrint("AR initialized successfully");
+      debugPrint(" AR initialized successfully");
     } catch (e) {
-      debugPrint("AR initialization error: $e");
+      debugPrint(" AR initialization error: $e");
       setState(() {
-        _statusMessage = "AR Init Failed: $e";
+        _statusMessage = " AR Init Failed: $e";
       });
+    }
+  }
+
+  // Download GLB model to local storage for better AR compatibility
+  Future<String?> _downloadModelToLocal(String url) async {
+    try {
+      debugPrint("📥 Downloading model from: $url");
+
+      setState(() {
+        _statusMessage = "Downloading 3D model...";
+      });
+
+      // Get the application's documents directory
+      final appDir = await getApplicationDocumentsDirectory();
+      final modelsDir = Directory('${appDir.path}/ar_models');
+
+      // Create directory if it doesn't exist
+      if (!await modelsDir.exists()) {
+        await modelsDir.create(recursive: true);
+      }
+
+      // Generate unique filename from URL or timestamp
+      final fileName = '${DateTime.now().millisecondsSinceEpoch}.glb';
+      final filePath = '${modelsDir.path}/$fileName';
+
+      // Download the file
+      final response = await http.get(Uri.parse(url)).timeout(
+        const Duration(minutes: 2),
+        onTimeout: () {
+          throw Exception(
+              'Download timeout - model file too large or slow connection');
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final file = File(filePath);
+        await file.writeAsBytes(response.bodyBytes);
+
+        final fileSize = await file.length();
+        debugPrint("✅ Model downloaded successfully!");
+        debugPrint("📁 Local path: $filePath");
+        debugPrint("📦 File size: ${(fileSize / 1024).toStringAsFixed(2)} KB");
+
+        setState(() {
+          _statusMessage = "Model ready! Tap to place in AR";
+        });
+
+        return filePath;
+      } else {
+        debugPrint("❌ Download failed with status: ${response.statusCode}");
+        return null;
+      }
+    } catch (e) {
+      debugPrint("❌ Error downloading model: $e");
+      setState(() {
+        _statusMessage = "Download failed: $e";
+      });
+      return null;
+    }
+  }
+
+  // Get optimal scale based on file size (Meshy AI optimization)
+  double _getOptimalScale(int fileSizeBytes) {
+    final double sizeMB = fileSizeBytes / (1024 * 1024);
+
+    debugPrint(
+        "🎨 Calculating optimal scale for ${sizeMB.toStringAsFixed(2)} MB model");
+
+    double scale;
+    if (sizeMB < 5.0) {
+      debugPrint("  Small model: Using 100% scale");
+      scale = 1.0; // Small models: full scale
+    } else if (sizeMB < 15.0) {
+      debugPrint("  Medium model: Using 60% scale");
+      scale = 0.6; // Medium models: balanced scale
+    } else {
+      debugPrint("  Large model: Using 40% scale");
+      scale = 0.4; // Large models: reduced scale for performance
+    }
+
+    debugPrint("  Returning scale: $scale (type: ${scale.runtimeType})");
+    return scale;
+  }
+
+  // Validate that the model URL is accessible
+  Future<bool> _validateModelUrl(String url) async {
+    try {
+      debugPrint(" Validating model URL: $url");
+      final response = await http.head(Uri.parse(url));
+      debugPrint(" URL response status: ${response.statusCode}");
+      debugPrint(" Content-Type: ${response.headers['content-type']}");
+      debugPrint(" Content-Length: ${response.headers['content-length']}");
+
+      if (response.statusCode == 200) {
+        debugPrint(" Model URL is accessible");
+        return true;
+      } else {
+        debugPrint(" Model URL returned status: ${response.statusCode}");
+        return false;
+      }
+    } catch (e) {
+      debugPrint(" Error validating model URL: $e");
+      return false;
     }
   }
 
   Future<void> _onPlaneOrPointTapped(
       List<ARHitTestResult> hitTestResults) async {
-    if (hitTestResults.isEmpty || _selectedModelUrl == null) return;
+    debugPrint("=== PLANE TAP DETECTED ===");
+    debugPrint("Hit results count: ${hitTestResults.length}");
+    debugPrint("Selected model URL: $_selectedModelUrl");
+
+    if (hitTestResults.isEmpty) {
+      debugPrint("No hit test results");
+      setState(() {
+        _statusMessage = "No surface detected. Try moving the camera.";
+      });
+      return;
+    }
+
+    if (_selectedModelUrl == null) {
+      debugPrint("No model URL selected");
+      setState(() {
+        _statusMessage = "No model selected. Choose a model first.";
+      });
+      return;
+    }
 
     final hit = hitTestResults.first;
+    debugPrint("Hit position: ${hit.worldTransform.getColumn(3)}");
 
     setState(() {
       _statusMessage = "Placing Meshy AI model...";
     });
 
     try {
+      final isUrlValid = await _validateModelUrl(_selectedModelUrl!);
+      if (!isUrlValid) {
+        setState(() {
+          _statusMessage = "Invalid model URL. Please select another model.";
+        });
+        return;
+      }
+
+      // Download the model to local storage
+      final localModelPath = await _downloadModelToLocal(_selectedModelUrl!);
+      if (localModelPath == null) {
+        setState(() {
+          _statusMessage = "Failed to download model. Please try again.";
+        });
+        return;
+      }
+
+// Store for cleanup
+
+      // Get file size for optimal scaling
+      final fileSize = await File(localModelPath).length();
+      final optimalScale = _getOptimalScale(fileSize);
+
+      debugPrint("📊 Meshy AI Model Optimization:");
+      debugPrint(
+          "  - File size: ${(fileSize / (1024 * 1024)).toStringAsFixed(2)} MB");
+      debugPrint("  - Optimal scale: $optimalScale");
+      debugPrint("  - Scale type check: ${optimalScale.runtimeType}");
+      debugPrint("  - Is finite: ${optimalScale.isFinite}");
+
       final newAnchor = ARPlaneAnchor(transformation: hit.worldTransform);
       bool? didAddAnchor = await arAnchorManager!.addAnchor(newAnchor);
+      debugPrint("⚓ Anchor added: $didAddAnchor");
 
       if (didAddAnchor == true) {
         anchors.add(newAnchor);
 
-        // Use the Meshy AI model URL instead of local asset
-        final node = ARNode(
+        // Ensure scale is a valid double and create Vector3 components explicitly
+        final double scaleValue = optimalScale.isFinite ? optimalScale : 0.5;
+        debugPrint("  - Final scale value: $scaleValue");
+
+        // Create AR node optimized for Meshy AI GLB models
+        ARNode node = ARNode(
           type: NodeType.webGLB,
-          uri: _selectedModelUrl!,
-          scale: vector.Vector3(0.2, 0.2, 0.2),
+          uri:
+              'file://$localModelPath', // Local file path (ar_flutter_plugin_2 compatible)
+          scale: vector.Vector3(scaleValue, scaleValue, scaleValue),
           position: vector.Vector3(
             hit.worldTransform.getColumn(3).x,
-            hit.worldTransform.getColumn(3).y,
+            hit.worldTransform.getColumn(3).y + 0.15, // Elevated for visibility
             hit.worldTransform.getColumn(3).z,
           ),
           rotation: vector.Vector4(0, 0, 0, 1),
         );
 
+        debugPrint("🎯 Meshy AI Model AR Configuration:");
+        debugPrint("  - Plugin: ar_flutter_plugin_2 v0.0.3");
+        debugPrint("  - Format: GLB (Binary GLTF)");
+        debugPrint("  - Features: PBR materials, optimized mesh");
+        debugPrint("  - Type: ${node.type}");
+        debugPrint("  - Path: ${node.uri}");
+        debugPrint("  - Scale: ${node.scale}");
+        debugPrint("  - Position: ${node.position}");
+
+        setState(() {
+          _statusMessage = "Placing 3D model in AR...";
+        });
+
         bool? didAddNode =
             await arObjectManager!.addNode(node, planeAnchor: newAnchor);
+        debugPrint("📦 Node added result: $didAddNode");
 
-        if (didAddNode == true) {
-          nodes.add(node);
+        // Add more detailed error checking
+        if (didAddNode == null) {
+          debugPrint("⚠️ addNode returned null - possible plugin error");
           setState(() {
-            _statusMessage = "Meshy model placed! Total: ${nodes.length}";
-          });
-        } else {
-          setState(() {
-            _statusMessage = "Failed to place model";
+            _statusMessage = "Plugin error - check logs";
           });
           await arAnchorManager!.removeAnchor(newAnchor);
           anchors.remove(newAnchor);
+        } else if (didAddNode == false) {
+          debugPrint("❌ addNode returned false - node creation failed");
+          debugPrint("   Troubleshooting:");
+          debugPrint("   - File path: $localModelPath");
+          debugPrint(
+              "   - File exists: ${await File(localModelPath).exists()}");
+          debugPrint(
+              "   - File size: ${await File(localModelPath).length()} bytes");
+          debugPrint("   Possible causes:");
+          debugPrint("   - GLB file format incompatible with ARCore");
+          debugPrint("   - File corrupted during download");
+          debugPrint("   - ARCore version incompatibility");
+          debugPrint("   - Insufficient device resources");
+
+          setState(() {
+            _statusMessage = "Failed to load 3D model. Try a different model.";
+          });
+          await arAnchorManager!.removeAnchor(newAnchor);
+          anchors.remove(newAnchor);
+        } else if (didAddNode == true) {
+          nodes.add(node);
+          setState(() {
+            _statusMessage = "✅ 3D Model placed! (${nodes.length} total)";
+          });
+          debugPrint("✅ Model placed successfully!");
+
+          // Additional debugging for model visibility
+          debugPrint("🔍 Model placement details:");
+          debugPrint("  - Total nodes in scene: ${nodes.length}");
+          debugPrint("  - Total anchors in scene: ${anchors.length}");
+          debugPrint("  - Local file: $localModelPath");
+          debugPrint("  - Node URI: ${node.uri}");
+          debugPrint("  - Node scale: ${node.scale}");
+          debugPrint("  - Node position: ${node.position}");
+          debugPrint("  - Anchor transformation: ${newAnchor.transformation}");
+
+          // Give user feedback
+          Future.delayed(Duration(seconds: 1), () {
+            if (mounted) {
+              setState(() {
+                _statusMessage = "Model visible! Look at the placed location.";
+              });
+            }
+          });
         }
+      } else {
+        setState(() {
+          _statusMessage = "Failed to place model (anchor)";
+        });
+        debugPrint("Failed to add anchor to AR scene");
       }
     } catch (e) {
       setState(() {
         _statusMessage = "Error: $e";
+      });
+      debugPrint("Exception in _onPlaneOrPointTapped: $e");
+    }
+  }
+
+  // Clear all placed models and anchors
+  Future<void> _clearAllModels() async {
+    try {
+      debugPrint("Clearing all models...");
+
+      // Remove all nodes
+      for (final node in nodes) {
+        await arObjectManager?.removeNode(node);
+      }
+
+      // Remove all anchors
+      for (final anchor in anchors) {
+        await arAnchorManager?.removeAnchor(anchor);
+      }
+
+      // Clear lists
+      nodes.clear();
+      anchors.clear();
+
+      setState(() {
+        _statusMessage = "All models cleared. Select a new model to place.";
+      });
+
+      debugPrint(" All models cleared successfully");
+    } catch (e) {
+      debugPrint(" Error clearing models: $e");
+      setState(() {
+        _statusMessage = "Error clearing models: $e";
       });
     }
   }

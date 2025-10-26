@@ -5,6 +5,8 @@ import 'package:rexplore/components/my_button.dart';
 import 'package:rexplore/components/square_tile.dart';
 import 'package:rexplore/firebase_service.dart';
 import 'package:rexplore/services/auth_service.dart';
+import 'package:rexplore/utilities/disposable_email_checker.dart';
+import 'package:rexplore/utilities/email_verification.dart';
 
 class RegisterPage extends StatefulWidget {
   final Function()? onTap;
@@ -31,11 +33,20 @@ class _RegisterPageState extends State<RegisterPage> {
   bool passwordsMatch = false;
   bool showPasswordRequirements = false;
 
+  // Terms and Conditions acceptance
+  bool acceptedTerms = false;
+
+  // Email validation state
+  bool isCheckingEmail = false;
+  bool? isEmailAvailable;
+  String? emailValidationMessage;
+
   @override
   void initState() {
     super.initState();
     passwordController.addListener(_validatePassword);
     confirmPasswordController.addListener(_validatePassword);
+    emailController.addListener(_validateEmail);
   }
 
   void _validatePassword() {
@@ -52,6 +63,72 @@ class _RegisterPageState extends State<RegisterPage> {
     });
   }
 
+  // Email validation with debouncing
+  void _validateEmail() async {
+    final email = emailController.text.trim();
+
+    // Reset state if email is empty
+    if (email.isEmpty) {
+      setState(() {
+        isCheckingEmail = false;
+        isEmailAvailable = null;
+        emailValidationMessage = null;
+      });
+      return;
+    }
+
+    // Check email format first
+    if (!EmailVerification.isValidEmailFormat(email)) {
+      setState(() {
+        isCheckingEmail = false;
+        isEmailAvailable = false;
+        emailValidationMessage = 'Invalid email format';
+      });
+      return;
+    }
+
+    // Check for disposable email
+    final isDisposable = await DisposableEmailChecker.isDisposable(email);
+    if (isDisposable) {
+      setState(() {
+        isCheckingEmail = false;
+        isEmailAvailable = false;
+        emailValidationMessage = 'Disposable email not allowed';
+      });
+      return;
+    }
+
+    // Show loading state
+    setState(() {
+      isCheckingEmail = true;
+      emailValidationMessage = 'Checking availability...';
+    });
+
+    // Wait a bit to avoid too many API calls (debouncing)
+    await Future.delayed(const Duration(milliseconds: 500));
+
+    // Check if the text changed during the delay
+    if (email != emailController.text.trim()) {
+      return; // User is still typing, don't check
+    }
+
+    try {
+      final available = await EmailVerification.isEmailAvailable(email);
+      setState(() {
+        isCheckingEmail = false;
+        isEmailAvailable = available;
+        emailValidationMessage =
+            available ? 'Email is available' : 'Email already registered';
+      });
+    } catch (e) {
+      setState(() {
+        isCheckingEmail = false;
+        isEmailAvailable = null;
+        emailValidationMessage = 'Error checking email';
+      });
+    }
+  }
+
   @override
   void dispose() {
     emailController.dispose();
@@ -66,6 +143,40 @@ class _RegisterPageState extends State<RegisterPage> {
   void createAccount() async {
     final password = passwordController.text.trim();
     final confirmPassword = confirmPasswordController.text.trim();
+    final emailText = emailController.text.trim();
+
+    // Validate email is not empty
+    if (emailText.isEmpty) {
+      showErrorMessage("Please enter an email address.");
+      return;
+    }
+
+    // Validate email format
+    if (!EmailVerification.isValidEmailFormat(emailText)) {
+      showErrorMessage("Please enter a valid email address.");
+      return;
+    }
+
+    // Check for disposable email
+    final isDisposable = await DisposableEmailChecker.isDisposable(emailText);
+    if (isDisposable) {
+      showErrorMessage(
+          "Disposable email addresses are not allowed.\nPlease use a permanent email address.");
+      return;
+    }
+
+    // Check if email is already registered
+    try {
+      final isAvailable = await EmailVerification.isEmailAvailable(emailText);
+      if (!isAvailable) {
+        showErrorMessage(
+            "This email is already registered.\nPlease use a different email or try logging in.");
+        return;
+      }
+    } catch (e) {
+      showErrorMessage("Error verifying email: ${e.toString()}");
+      return;
+    }
 
     // Validate Date of Birth
     DateTime? dob;
@@ -101,7 +212,7 @@ class _RegisterPageState extends State<RegisterPage> {
         !hasLowercase ||
         !hasNumber ||
         !hasSpecialChar) {
-      showErrorMessage("Please meet all password requirements.");
+      showErrorMessage("Meet all password requirements.");
       return;
     }
 
@@ -111,25 +222,166 @@ class _RegisterPageState extends State<RegisterPage> {
       return;
     }
 
+    // Check if terms and conditions are accepted
+    if (!acceptedTerms) {
+      showErrorMessage("Accept the Terms and Conditions to continue.");
+      return;
+    }
+
     showDialog(
       context: context,
       builder: (context) => const Center(child: CircularProgressIndicator()),
     );
 
     try {
-      await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: emailController.text.trim(),
+      // Create user account
+      UserCredential userCredential =
+          await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: emailText,
         password: password,
       );
 
+      // Send email verification
+      await userCredential.user?.sendEmailVerification();
+
+      // Add user to Firestore
       await FirebaseService().addUser(
         firstName: firstNameController.text.trim(),
         lastName: lastNameController.text.trim(),
         age: userAge,
-        email: emailController.text.trim(),
+        email: emailText,
       );
 
-      Navigator.of(context).pop();
+      Navigator.of(context).pop(); // Close loading dialog
+
+      // Show success message with email verification instruction
+      if (mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => AlertDialog(
+            backgroundColor: const Color(0xff2A303E),
+            title: const Row(
+              children: [
+                Icon(Icons.mark_email_read, color: Colors.green, size: 32),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Verify Your Email',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Account created successfully!',
+                  style: TextStyle(
+                    color: Colors.green,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'A verification email has been sent to:',
+                  style: TextStyle(color: Colors.grey[300], fontSize: 14),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  emailText,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Please check your inbox and click the verification link to activate your account.',
+                  style: TextStyle(color: Colors.grey[300], fontSize: 13),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.info_outline,
+                          color: Colors.blue, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Check your spam folder if you don\'t see the email.',
+                          style: TextStyle(
+                            color: Colors.grey[300],
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () async {
+                  // Resend verification email
+                  try {
+                    await userCredential.user?.sendEmailVerification();
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Verification email resent!'),
+                          backgroundColor: Colors.green,
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Error: ${e.toString()}'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
+                  }
+                },
+                child: const Text(
+                  'Resend Email',
+                  style: TextStyle(color: Colors.blue),
+                ),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.of(context).pop(); // Close verification dialog
+                  Navigator.of(context).pop(); // Close register dialog
+                  // User will need to verify email before logging in
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
+                ),
+                child: const Text(
+                  'OK',
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
+            ],
+          ),
+        );
+      }
     } catch (e) {
       Navigator.of(context).pop();
       showErrorMessage("Registration failed: ${e.toString()}");
@@ -277,6 +529,10 @@ class _RegisterPageState extends State<RegisterPage> {
                   hintText: 'Email',
                   obscureText: false,
                 ),
+                if (emailValidationMessage != null) ...[
+                  SizedBox(height: screenHeight * 0.01),
+                  _buildEmailValidationIndicator(textSize),
+                ],
                 SizedBox(height: screenHeight * 0.015),
                 MyTextfield(
                   controller: passwordController,
@@ -297,7 +553,9 @@ class _RegisterPageState extends State<RegisterPage> {
                   SizedBox(height: screenHeight * 0.01),
                   _buildPasswordMatchIndicator(textSize),
                 ],
-                SizedBox(height: screenHeight * 0.02),
+                SizedBox(height: screenHeight * 0.015),
+                _buildTermsAndConditions(textSize),
+                SizedBox(height: screenHeight * 0.015),
                 MyButton(
                   text: "Create Account",
                   onTap: createAccount,
@@ -474,6 +732,225 @@ class _RegisterPageState extends State<RegisterPage> {
             style: TextStyle(
               color: passwordsMatch ? Colors.green : Colors.red,
               fontSize: textSize * 0.85,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmailValidationIndicator(double textSize) {
+    Color indicatorColor;
+    IconData icon;
+
+    if (isCheckingEmail) {
+      indicatorColor = Colors.blue;
+      icon = Icons.hourglass_empty;
+    } else if (isEmailAvailable == true) {
+      indicatorColor = Colors.green;
+      icon = Icons.check_circle;
+    } else {
+      indicatorColor = Colors.red;
+      icon = Icons.cancel;
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xff1E2330),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: indicatorColor.withOpacity(0.5),
+        ),
+      ),
+      child: Row(
+        children: [
+          if (isCheckingEmail)
+            SizedBox(
+              width: textSize * 1.2,
+              height: textSize * 1.2,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation<Color>(indicatorColor),
+              ),
+            )
+          else
+            Icon(
+              icon,
+              color: indicatorColor,
+              size: textSize * 1.2,
+            ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              emailValidationMessage ?? '',
+              style: TextStyle(
+                color: indicatorColor,
+                fontSize: textSize * 0.85,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTermsAndConditions(double textSize) {
+    return Row(
+      children: [
+        Transform.scale(
+          scale: 1.3,
+          child: Checkbox(
+            value: acceptedTerms,
+            onChanged: (value) {
+              setState(() {
+                acceptedTerms = value ?? false;
+              });
+            },
+            activeColor: Colors.grey[600],
+            checkColor: Colors.white70,
+            side: BorderSide(color: Colors.grey[500]!, width: 1.5),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: GestureDetector(
+            onTap: () {
+              _showTermsAndConditionsDialog();
+            },
+            child: Text(
+              'I Accept the Terms and Conditions',
+              style: TextStyle(
+                color: Colors.grey[300],
+                fontSize: textSize * 1.0,
+                decoration: TextDecoration.underline,
+                decorationColor: Colors.grey[500],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showTermsAndConditionsDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: const Color(0xff2A303E),
+          title: const Text(
+            'Terms and Conditions',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Welcome to ReXplore!',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'By using this application, you agree to the following terms and conditions:',
+                  style: TextStyle(color: Colors.grey[300], fontSize: 14),
+                ),
+                const SizedBox(height: 15),
+                _buildTermItem(
+                  '1. Account Registration',
+                  'You must be at least 16 years old to register. All information provided must be accurate and up-to-date.',
+                ),
+                _buildTermItem(
+                  '2. Privacy',
+                  'We collect and store your personal information securely. Your data will not be shared with third parties without your consent.',
+                ),
+                _buildTermItem(
+                  '3. User Conduct',
+                  'You agree to use this application responsibly and not engage in any activities that may harm other users or the service.',
+                ),
+                _buildTermItem(
+                  '4. Intellectual Property',
+                  'All content and features in this app are owned by ReXplore and protected by intellectual property laws.',
+                ),
+                _buildTermItem(
+                  '5. Limitation of Liability',
+                  'ReXplore is not liable for any damages arising from the use of this application.',
+                ),
+                _buildTermItem(
+                  '6. Changes to Terms',
+                  'We reserve the right to modify these terms at any time. Continued use of the app constitutes acceptance of any changes.',
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'Last updated: October 24, 2025',
+                  style: TextStyle(
+                    color: Colors.grey[500],
+                    fontSize: 12,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text(
+                'Close',
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                setState(() {
+                  acceptedTerms = true;
+                });
+                Navigator.of(context).pop();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.deepPurple,
+              ),
+              child: const Text(
+                'Accept',
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildTermItem(String title, String description) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            description,
+            style: TextStyle(
+              color: Colors.grey[400],
+              fontSize: 13,
             ),
           ),
         ],

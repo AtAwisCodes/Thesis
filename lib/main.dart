@@ -8,6 +8,7 @@ import 'package:rexplore/pages/auth_page.dart';
 import 'package:rexplore/services/ThemeProvider.dart';
 import 'package:rexplore/theme.dart/darkTheme.dart';
 import 'package:rexplore/theme.dart/lightTheme.dart';
+import 'package:rexplore/utilities/disposable_email_checker.dart';
 import 'package:rexplore/viewmodel/yt_videoview_model.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'firebase_options.dart';
@@ -29,6 +30,10 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  // Load disposable email domains
+  await DisposableEmailChecker.loadDisposableDomains();
+
   GetIt.instance.registerSingleton<FirebaseService>(FirebaseService());
   runApp(
     MultiProvider(

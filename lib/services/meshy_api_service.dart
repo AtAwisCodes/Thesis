@@ -1,9 +1,36 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
+/// Backend environment options
+enum BackendEnvironment {
+  local, // Same WiFi network only
+  ngrok, // Temporary public access (for testing)
+  production, // Deployed to cloud (Render/Railway/etc)
+}
+
 class MeshyApiService {
-  //DITO MO LAGAY IP MO LANS YESHUA DE GUZMAN
-  static const String baseUrl = 'http://192.168.100.25:5000';
+  /// Current environment - change this to switch between local/ngrok/production
+  static const BackendEnvironment _environment = BackendEnvironment.local;
+
+  /// Backend URLs for different environments
+  static const String _localUrl =
+      'http://192.168.100.25:5000'; // Same WiFi only
+  static const String _ngrokUrl =
+      'https://your-ngrok-url.ngrok.io'; // Update when using ngrok
+  static const String _productionUrl =
+      'https://your-app.onrender.com'; // Update when deployed
+
+  /// Get the active backend URL based on environment
+  static String get baseUrl {
+    switch (_environment) {
+      case BackendEnvironment.local:
+        return _localUrl;
+      case BackendEnvironment.ngrok:
+        return _ngrokUrl;
+      case BackendEnvironment.production:
+        return _productionUrl;
+    }
+  }
 
   /// Generate a 3D model from a video's modelImages
   static Future<Map<String, dynamic>> generateModel({
@@ -244,5 +271,142 @@ class MeshyApiService {
     } catch (e) {
       throw Exception('Error fetching model: $e');
     }
+  }
+
+  // ============================================================================
+  // UTILITY METHODS
+  // ============================================================================
+
+  /// Get current environment name
+  static String get currentEnvironment {
+    return _environment.toString().split('.').last;
+  }
+
+  /// Check if backend is reachable with helpful error messages
+  static Future<Map<String, dynamic>> checkBackendStatus() async {
+    try {
+      print('🔍 Checking backend at: $baseUrl');
+      print('📍 Environment: $currentEnvironment');
+
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/health'),
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        print('✅ Backend is healthy!');
+        return {
+          'status': 'healthy',
+          'url': baseUrl,
+          'environment': currentEnvironment,
+          'message': 'Backend is accessible and running correctly',
+        };
+      } else {
+        print('⚠️ Backend returned status: ${response.statusCode}');
+        return {
+          'status': 'error',
+          'url': baseUrl,
+          'environment': currentEnvironment,
+          'message': 'Backend returned status ${response.statusCode}',
+        };
+      }
+    } catch (e) {
+      print('❌ Backend not reachable: $e');
+
+      // Provide helpful error messages based on environment
+      String helpMessage = '';
+      switch (_environment) {
+        case BackendEnvironment.local:
+          helpMessage = '''
+Backend not reachable on local network.
+Troubleshooting:
+1. Is the backend running? (python backend/app.py)
+2. Are you on the same WiFi network?
+3. Check firewall settings
+4. Verify the IP address: $_localUrl
+5. Try pinging the server
+
+For testing from different networks, use ngrok instead!
+''';
+          break;
+        case BackendEnvironment.ngrok:
+          helpMessage = '''
+ngrok tunnel not reachable.
+Troubleshooting:
+1. Is ngrok running? (ngrok http 5000)
+2. Did you update _ngrokUrl with your ngrok URL?
+3. ngrok URLs change each time - check for a new one
+4. Verify the URL: $_ngrokUrl
+''';
+          break;
+        case BackendEnvironment.production:
+          helpMessage = '''
+Production backend not reachable.
+Troubleshooting:
+1. Is the backend deployed?
+2. Check deployment logs on Render/Railway
+3. Verify the URL: $_productionUrl
+4. Check for deployment errors
+''';
+          break;
+      }
+
+      return {
+        'status': 'unreachable',
+        'url': baseUrl,
+        'environment': currentEnvironment,
+        'error': e.toString(),
+        'message': 'Cannot reach backend',
+        'help': helpMessage,
+      };
+    }
+  }
+
+  /// Get configuration info for debugging
+  static Map<String, dynamic> getConfigInfo() {
+    return {
+      'environment': currentEnvironment,
+      'baseUrl': baseUrl,
+      'localUrl': _localUrl,
+      'ngrokUrl': _ngrokUrl,
+      'productionUrl': _productionUrl,
+      'note':
+          'For viewing models, use FirestoreModelService (no backend needed!)',
+    };
+  }
+
+  /// Print helpful setup information
+  static void printSetupInfo() {
+    print('\n' + '=' * 70);
+    print('🔧 MESHY API SERVICE CONFIGURATION');
+    print('=' * 70);
+    print('Current Environment: $currentEnvironment');
+    print('Backend URL: $baseUrl');
+    print('');
+    print('💡 TIPS:');
+    print('');
+    if (_environment == BackendEnvironment.local) {
+      print('⚠️  You\'re using LOCAL mode - only works on same WiFi');
+      print('   To test from any network, use ngrok:');
+      print('   1. Run: ngrok http 5000');
+      print('   2. Update _ngrokUrl in meshy_api_service.dart');
+      print('   3. Set _environment = BackendEnvironment.ngrok');
+    } else if (_environment == BackendEnvironment.ngrok) {
+      print('✅ You\'re using NGROK mode - works from any network');
+      print('   Remember: ngrok URL changes when you restart ngrok');
+      print('   Current URL: $_ngrokUrl');
+    } else {
+      print('✅ You\'re using PRODUCTION mode - works from any network');
+      print('   Deployment URL: $_productionUrl');
+    }
+    print('');
+    print('📦 For VIEWING models (no backend needed):');
+    print('   Use: FirestoreModelService.getModelsForVideo(videoId)');
+    print('   Works from ANY network without backend!');
+    print('');
+    print('🔨 For GENERATING models (backend required):');
+    print('   Use: MeshyApiService.generateModel(videoId, userId)');
+    print('   Requires backend to be running and accessible');
+    print('=' * 70 + '\n');
   }
 }

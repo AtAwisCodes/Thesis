@@ -89,15 +89,16 @@ def generate_3d_model():
                 "error": "modelImages missing or less than 3 images required"
             }), 400
 
-        # Step 2: Send to Meshy AI
+        # Step 2: Send to Meshy AI (using v1 API supported parameters only)
         payload = {
             "image_urls": image_urls,
-            "should_remesh": True,
-            "should_texture": True,
-            "enable_pbr": True
+            "should_remesh": True,          # Optimize mesh topology
+            "should_texture": True,         # Add realistic textures
+            "enable_pbr": True              # PBR materials for better lighting
         }
 
         print(f"Sending {len(image_urls)} images to Meshy AI...")
+        print(f"Configuration: remesh={payload['should_remesh']}, texture={payload['should_texture']}, pbr={payload['enable_pbr']}")
         response = requests.post(
             "https://api.meshy.ai/openapi/v1/multi-image-to-3d",
             headers=get_meshy_headers(),
@@ -284,18 +285,8 @@ def list_available_models():
         user_id = request.args.get('user_id')
         video_id = request.args.get('video_id')
 
-        query = db.collection("generated_models_files")
-        
-        if user_id:
-            query = query.where("userId", "==", user_id)
-        
-        if video_id:
-            query = query.where("videoId", "==", video_id)
-        
-        query = query.where("status", "==", "ready").order_by(
-            "createdAt", 
-            direction=firestore.Query.DESCENDING
-        )
+        # Simple query without ordering to avoid index issues
+        query = db.collection("generated_models_files").where("status", "==", "ready")
 
         docs = query.stream()
         
@@ -303,7 +294,17 @@ def list_available_models():
         for doc in docs:
             model_data = doc.to_dict()
             model_data['id'] = doc.id
+            
+            # Apply filters in Python instead of Firestore
+            if user_id and model_data.get('userId') != user_id:
+                continue
+            if video_id and model_data.get('videoId') != video_id:
+                continue
+                
             models.append(model_data)
+
+        # Sort by createdAt in Python (most recent first)
+        models.sort(key=lambda x: x.get('createdAt', 0), reverse=True)
 
         return jsonify({
             "success": True,
@@ -323,7 +324,8 @@ def get_models_for_video(video_id):
     Returns the models that can be displayed in AR for this video.
     """
     try:
-        query = db.collection("generated_models_files").where("videoId", "==", video_id).where("status", "==", "ready")
+        # Simple query without complex filtering to avoid index issues
+        query = db.collection("generated_models_files").where("status", "==", "ready")
         
         docs = query.stream()
         
@@ -331,7 +333,10 @@ def get_models_for_video(video_id):
         for doc in docs:
             model_data = doc.to_dict()
             model_data['id'] = doc.id
-            models.append(model_data)
+            
+            # Filter by videoId in Python
+            if model_data.get('videoId') == video_id:
+                models.append(model_data)
 
         return jsonify({
             "success": True,
