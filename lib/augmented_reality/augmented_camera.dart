@@ -165,7 +165,7 @@ class _MeshyARCameraState extends State<MeshyARCamera> {
         final progress = update['progress'] ?? 0;
 
         setState(() {
-          _statusMessage = "Model status: $status (${progress}%)";
+          _statusMessage = "Model status: $status ($progress%)";
         });
 
         if (status == 'SUCCEEDED') {
@@ -223,11 +223,11 @@ class _MeshyARCameraState extends State<MeshyARCamera> {
 
         setState(() {
           _deviceInfo = """
-Device: ${androidInfo.brand} ${androidInfo.model}
-Android Version: ${androidInfo.version.release}
-SDK: ${androidInfo.version.sdkInt}
-Manufacturer: ${androidInfo.manufacturer}
-""";
+            Device: ${androidInfo.brand} ${androidInfo.model}
+            Android Version: ${androidInfo.version.release}
+            SDK: ${androidInfo.version.sdkInt}
+            Manufacturer: ${androidInfo.manufacturer}
+            """;
         });
 
         if (androidInfo.version.sdkInt < 24) {
@@ -460,7 +460,7 @@ Manufacturer: ${androidInfo.manufacturer}
                         onTap: () {
                           setState(() {
                             _selectedModelUrl = model['modelFileUrl'];
-// Reset to force new download
+                            // Reset to force new download
                             _statusMessage =
                                 "Model selected. Tap screen to place!";
                           });
@@ -492,14 +492,14 @@ Manufacturer: ${androidInfo.manufacturer}
     });
 
     try {
-      debugPrint("🎨 Initializing AR session with enhanced settings...");
+      debugPrint("Initializing AR session with enhanced settings...");
       arSessionManager!.onInitialize(
         showFeaturePoints: true,
         showPlanes: true,
         showWorldOrigin: true,
         handleTaps: false,
-        handlePans: true, // Enable pan gestures
-        handleRotation: true, // Enable rotation gestures
+        handlePans: true,
+        handleRotation: true,
       );
 
       debugPrint(" Initializing AR object manager...");
@@ -532,7 +532,7 @@ Manufacturer: ${androidInfo.manufacturer}
   // Download GLB model to local storage for better AR compatibility
   Future<String?> _downloadModelToLocal(String url) async {
     try {
-      debugPrint("📥 Downloading model from: $url");
+      debugPrint("Downloading model from: $url");
 
       setState(() {
         _statusMessage = "Downloading 3D model...";
@@ -565,9 +565,9 @@ Manufacturer: ${androidInfo.manufacturer}
         await file.writeAsBytes(response.bodyBytes);
 
         final fileSize = await file.length();
-        debugPrint("✅ Model downloaded successfully!");
-        debugPrint("📁 Local path: $filePath");
-        debugPrint("📦 File size: ${(fileSize / 1024).toStringAsFixed(2)} KB");
+        debugPrint("Model downloaded successfully!");
+        debugPrint("Local path: $filePath");
+        debugPrint("File size: ${(fileSize / 1024).toStringAsFixed(2)} KB");
 
         setState(() {
           _statusMessage = "Model ready! Tap to place in AR";
@@ -575,11 +575,11 @@ Manufacturer: ${androidInfo.manufacturer}
 
         return filePath;
       } else {
-        debugPrint("❌ Download failed with status: ${response.statusCode}");
+        debugPrint("Download failed with status: ${response.statusCode}");
         return null;
       }
     } catch (e) {
-      debugPrint("❌ Error downloading model: $e");
+      debugPrint("Error downloading model: $e");
       setState(() {
         _statusMessage = "Download failed: $e";
       });
@@ -592,7 +592,7 @@ Manufacturer: ${androidInfo.manufacturer}
     final double sizeMB = fileSizeBytes / (1024 * 1024);
 
     debugPrint(
-        "🎨 Calculating optimal scale for ${sizeMB.toStringAsFixed(2)} MB model");
+        "Calculating optimal scale for ${sizeMB.toStringAsFixed(2)} MB model");
 
     double scale;
     if (sizeMB < 5.0) {
@@ -685,7 +685,7 @@ Manufacturer: ${androidInfo.manufacturer}
       final fileSize = await File(localModelPath).length();
       final optimalScale = _getOptimalScale(fileSize);
 
-      debugPrint("📊 Meshy AI Model Optimization:");
+      debugPrint("Meshy AI Model Optimization:");
       debugPrint(
           "  - File size: ${(fileSize / (1024 * 1024)).toStringAsFixed(2)} MB");
       debugPrint("  - Optimal scale: $optimalScale");
@@ -717,7 +717,7 @@ Manufacturer: ${androidInfo.manufacturer}
           rotation: vector.Vector4(0, 0, 0, 1),
         );
 
-        debugPrint("🎯 Meshy AI Model AR Configuration:");
+        debugPrint("Meshy AI Model AR Configuration:");
         debugPrint("  - Plugin: ar_flutter_plugin_2 v0.0.3");
         debugPrint("  - Format: GLB (Binary GLTF)");
         debugPrint("  - Features: PBR materials, optimized mesh");
@@ -764,9 +764,9 @@ Manufacturer: ${androidInfo.manufacturer}
         } else if (didAddNode == true) {
           nodes.add(node);
           setState(() {
-            _statusMessage = "✅ 3D Model placed! (${nodes.length} total)";
+            _statusMessage = "3D Model placed! (${nodes.length} total)";
           });
-          debugPrint("✅ Model placed successfully!");
+          debugPrint("Model placed successfully!");
 
           // Additional debugging for model visibility
           debugPrint("🔍 Model placement details:");

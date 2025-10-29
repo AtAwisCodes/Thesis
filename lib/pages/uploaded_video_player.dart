@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:rexplore/components/fullscreen_helper.dart';
+import 'package:rexplore/components/expandable_details.dart';
 import 'package:video_player/video_player.dart';
 import 'package:rexplore/services/favorites_manager.dart';
 import 'package:rexplore/augmented_reality/augmented_camera.dart';
@@ -52,6 +53,8 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
   bool isFollowed = false;
   bool isLiked = false;
   bool isDisliked = false;
+  int _likeCount = 0;
+  bool _isFavorited = false;
   bool _has3DModel = false;
   bool _isCheckingModel = true;
   String? _modelError;
@@ -59,6 +62,8 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
   int _viewCount = 0;
   String? _uploaderUserId;
   bool _showPlayPauseButton = false;
+  String _videoDescription = '';
+  String _selectedTab = 'Steps'; // Track selected tab: 'Steps' or 'Information'
 
   @override
   void initState() {
@@ -80,13 +85,16 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
       });
 
     // Load initial liked state
-    isLiked = FavoritesManager.instance.contains(widget.videoId);
+    _isFavorited = FavoritesManager.instance.contains(widget.videoId);
 
     // Add video to watch history
     _addToHistory();
 
     // Increment view count when video is opened
     _incrementViewCount();
+
+    // Fetch like count
+    _fetchLikeCount();
 
     // Check 3D model status
     _check3DModelStatus();
@@ -108,6 +116,15 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
       if (videoDoc.exists) {
         final data = videoDoc.data()!;
         _uploaderUserId = data['userId'] as String?;
+
+        // Load video description if available
+        if (data.containsKey('description')) {
+          if (mounted) {
+            setState(() {
+              _videoDescription = data['description'] as String? ?? '';
+            });
+          }
+        }
 
         if (_uploaderUserId != null) {
           // Check if current user is following this uploader
@@ -174,6 +191,41 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
     }
   }
 
+  // Fetch current like count from Firestore
+  Future<void> _fetchLikeCount() async {
+    if (widget.videoId.isEmpty) return;
+
+    try {
+      final videoDoc =
+          await _firestore.collection('videos').doc(widget.videoId).get();
+      if (videoDoc.exists && mounted) {
+        final data = videoDoc.data();
+        setState(() {
+          _likeCount = data?['likeCount'] ?? 0;
+        });
+      }
+
+      // Check if current user has liked this video
+      final currentUser = _auth.currentUser;
+      if (currentUser != null) {
+        final likeDoc = await _firestore
+            .collection('videos')
+            .doc(widget.videoId)
+            .collection('likes')
+            .doc(currentUser.uid)
+            .get();
+
+        if (mounted) {
+          setState(() {
+            isLiked = likeDoc.exists;
+          });
+        }
+      }
+    } catch (e) {
+      print('Error fetching like count: $e');
+    }
+  }
+
   Future<void> _check3DModelStatus() async {
     try {
       final status = await _uploadService.getModelStatus(widget.videoId);
@@ -214,7 +266,7 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
   // Load comments from Firestore
   Future<void> _loadComments() async {
     if (widget.videoId.isEmpty) {
-      print('❌ Cannot load comments: Video ID is empty');
+      print('Cannot load comments: Video ID is empty');
       if (mounted) {
         setState(() {
           _isLoadingComments = false;
@@ -253,7 +305,6 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
       }
     } catch (e) {
       print('Error loading comments with ordering: $e');
-      // If ordering fails, try without ordering
       try {
         print('Retrying without ordering...');
         final snapshot = await _firestore
@@ -474,19 +525,22 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
 
   @override
   void dispose() {
+    // Clear any active snackbars when leaving this page
+    ScaffoldMessenger.of(context).clearSnackBars();
+
     _controller.dispose();
     _commentController.dispose();
     super.dispose();
   }
 
-  //Updated to use Meshy AR Camera with videoId
+  //Meshy AR Camera with videoId
   Future<void> _openARCamera() async {
     if (mounted) {
       Navigator.push(
         context,
         MaterialPageRoute(
           builder: (context) => MeshyARCamera(
-            videoId: widget.videoId, // Pass the video ID to AR camera
+            videoId: widget.videoId,
           ),
         ),
       );
@@ -502,9 +556,93 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
     );
   }
 
-  Future<void> _toggleLikeAndFavorite() async {
+  // Toggle like for the video
+  Future<void> _toggleLike() async {
+    if (widget.videoId.isEmpty) return;
+
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please login to like videos'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    final userId = currentUser.uid;
+    final videoRef = _firestore.collection('videos').doc(widget.videoId);
+    final likeRef = videoRef.collection('likes').doc(userId);
+
+    try {
+      // Use Firestore transaction to ensure accurate like count
+      await _firestore.runTransaction((transaction) async {
+        final likeDoc = await transaction.get(likeRef);
+        final videoDoc = await transaction.get(videoRef);
+
+        final currentLikeCount = videoDoc.data()?['likeCount'] ?? 0;
+
+        if (likeDoc.exists) {
+          // User already liked, so unlike
+          transaction.delete(likeRef);
+          transaction.update(videoRef, {
+            'likeCount': currentLikeCount - 1 < 0 ? 0 : currentLikeCount - 1,
+          });
+
+          if (mounted) {
+            setState(() {
+              isLiked = false;
+              isDisliked = false;
+              _likeCount = currentLikeCount - 1 < 0 ? 0 : currentLikeCount - 1;
+            });
+          }
+        } else {
+          // User hasn't liked yet, so add like
+          transaction.set(likeRef, {
+            'userId': userId,
+            'likedAt': FieldValue.serverTimestamp(),
+          });
+          transaction.update(videoRef, {
+            'likeCount': currentLikeCount + 1,
+          });
+
+          if (mounted) {
+            setState(() {
+              isLiked = true;
+              isDisliked = false;
+              _likeCount = currentLikeCount + 1;
+            });
+          }
+
+          // Send like notification
+          if (_uploaderUserId != null) {
+            await _notificationService.sendLikeNotification(
+              videoId: widget.videoId,
+              videoOwnerId: _uploaderUserId!,
+              likerUserId: userId,
+              videoTitle: widget.title,
+            );
+          }
+        }
+      });
+    } catch (e) {
+      print('Error toggling like: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Failed to update like. Please try again.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      // Revert UI state on error
+      await _fetchLikeCount();
+    }
+  }
+
+  // Toggle favorites
+  Future<void> _toggleFavorites() async {
     final videoData = {
-      "id": widget.videoId, // Use videoId instead of videoUrl
+      "id": widget.videoId,
       "videoId": widget.videoId,
       "title": widget.title,
       "url": widget.videoUrl,
@@ -518,30 +656,43 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
     };
 
     setState(() {
-      isLiked = !isLiked;
-      if (isLiked) {
-        isDisliked = false; // clear dislike
-        FavoritesManager.instance.addFavorite(videoData);
-      } else {
-        FavoritesManager.instance.removeFavorite(widget.videoId);
-      }
+      _isFavorited = !_isFavorited;
     });
 
-    // Send like notification if user liked the video
-    if (isLiked && _uploaderUserId != null) {
-      final currentUser = _auth.currentUser;
-      if (currentUser != null) {
-        await _notificationService.sendLikeNotification(
-          videoId: widget.videoId,
-          videoOwnerId: _uploaderUserId!,
-          likerUserId: currentUser.uid,
-          videoTitle: widget.title,
-        );
-      }
+    if (_isFavorited) {
+      FavoritesManager.instance.addFavorite(videoData);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.bookmark, color: Colors.white),
+              SizedBox(width: 8),
+              Text('Added to favorites'),
+            ],
+          ),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    } else {
+      FavoritesManager.instance.removeFavorite(widget.videoId);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.bookmark_border, color: Colors.white),
+              SizedBox(width: 8),
+              Text('Removed from favorites'),
+            ],
+          ),
+          backgroundColor: Colors.grey,
+          duration: Duration(seconds: 2),
+        ),
+      );
     }
   }
 
-  /// Toggle follow/unfollow for the video uploader
+// Toggle follow/unfollow for the video uploader
   Future<void> _toggleFollow() async {
     if (_uploaderUserId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -619,6 +770,12 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
         );
       }
     }
+  }
+
+  /// Build video description text with relevant information
+  String _buildVideoDescription() {
+    // Return only the user-provided description
+    return _videoDescription.isNotEmpty ? _videoDescription : '';
   }
 
   // Open comments modal
@@ -866,6 +1023,258 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
     );
   }
 
+  /// Build the toggle section with Steps and Information tabs
+  Widget _buildInfoToggleSection() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Colors.grey.withOpacity(0.3),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        children: [
+          // Toggle buttons
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.grey.withOpacity(0.1),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(12),
+                topRight: Radius.circular(12),
+              ),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _selectedTab = 'Steps';
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: _selectedTab == 'Steps'
+                            ? const Color(0xff5BEC84)
+                            : Colors.transparent,
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(12),
+                        ),
+                      ),
+                      child: Center(
+                        child: Text(
+                          'Steps',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            color: _selectedTab == 'Steps'
+                                ? Colors.black
+                                : Theme.of(context).textTheme.bodyMedium?.color,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _selectedTab = 'Trivia';
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: _selectedTab == 'Trivia'
+                            ? const Color(0xff5BEC84)
+                            : Colors.transparent,
+                        borderRadius: const BorderRadius.only(
+                          topRight: Radius.circular(12),
+                        ),
+                      ),
+                      child: Center(
+                        child: Text(
+                          'Trivia',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            color: _selectedTab == 'Trivia'
+                                ? Colors.black
+                                : Theme.of(context).textTheme.bodyMedium?.color,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Content area - Scrollable
+          Container(
+            constraints: const BoxConstraints(
+              maxHeight: 300, // Maximum height for scrollable content
+              minHeight: 150, // Minimum height
+            ),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: _selectedTab == 'Steps'
+                  ? _buildStepsContent()
+                  : _buildInformationContent(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Build Steps tab content
+  Widget _buildStepsContent() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildStepItem(
+          1,
+          'Watch the Video',
+          'Carefully watch the entire video to understand the content and context.',
+        ),
+        const SizedBox(height: 12),
+        _buildStepItem(
+          2,
+          'Check for 3D Model',
+          'If available, tap "View in AR" to explore the 3D model in augmented reality.',
+        ),
+        const SizedBox(height: 12),
+        _buildStepItem(
+          3,
+          'Interact and Engage',
+          'Like the video, follow the creator, and leave comments to show your support.',
+        ),
+        const SizedBox(height: 12),
+        _buildStepItem(
+          4,
+          'Share Your Experience',
+          'Share this video with friends and help the creator reach more people.',
+        ),
+        const SizedBox(height: 12),
+        _buildStepItem(
+          5,
+          'Explore More',
+          'Check out similar videos and discover new content on ReXplore.',
+        ),
+      ],
+    );
+  }
+
+  /// Build a single step item
+  Widget _buildStepItem(int stepNumber, String title, String description) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: const Color(0xff5BEC84),
+            shape: BoxShape.circle,
+          ),
+          child: Center(
+            child: Text(
+              '$stepNumber',
+              style: const TextStyle(
+                color: Colors.black,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                description,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Theme.of(context)
+                      .textTheme
+                      .bodyMedium
+                      ?.color
+                      ?.withOpacity(0.7),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Build Information tab content
+  Widget _buildInformationContent() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [],
+    );
+  }
+
+  // Build a single information row
+  Widget _buildInfoRow(IconData icon, String label, String value) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(
+          icon,
+          size: 20,
+          color: const Color(0xff5BEC84),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Theme.of(context)
+                      .textTheme
+                      .bodyMedium
+                      ?.color
+                      ?.withOpacity(0.7),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -982,36 +1391,53 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
                         )
                       : const Center(child: CircularProgressIndicator()),
                 ),
-
                 // Title
                 Padding(
-                  padding: const EdgeInsets.all(12.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        widget.title,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      // View counts
-                      Row(
-                        children: [
-                          const SizedBox(width: 6),
-                          Text(
-                            '$_viewCount ${_viewCount == 1 ? 'view' : 'views'}',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey,
-                              fontWeight: FontWeight.w500,
-                            ),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12.0, vertical: 8.0),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.title,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
                           ),
-                        ],
+                          textAlign: TextAlign.left,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                // Expandable Details Section
+                ExpandableDetails(
+                  title: widget.title,
+                  details: _buildVideoDescription(),
+                  viewCount: _viewCount,
+                  uploadedAt: widget.uploadedAt,
+                  maxLinesCollapsed: 2,
+                  actionButton: Container(
+                    decoration: BoxDecoration(
+                      color: _isFavorited
+                          ? const Color(0xff5BEC84).withOpacity(0.2)
+                          : Colors.grey.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: IconButton(
+                      icon: Icon(
+                        _isFavorited ? Icons.bookmark : Icons.bookmark_border,
+                        color: _isFavorited
+                            ? const Color(0xff5BEC84)
+                            : Colors.grey[600],
                       ),
-                    ],
+                      onPressed: _toggleFavorites,
+                      tooltip: _isFavorited
+                          ? 'Remove from favorites'
+                          : 'Add to favorites',
+                    ),
                   ),
                 ),
 
@@ -1049,13 +1475,27 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
                       // Like / Dislike / Follow
                       Row(
                         children: [
-                          IconButton(
-                            icon: Icon(
-                              Icons.thumb_up,
-                              color: isLiked ? Colors.green : Colors.grey,
-                            ),
-                            onPressed: _toggleLikeAndFavorite,
+                          // Like button with count
+                          Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: Icon(
+                                  Icons.thumb_up,
+                                  color: isLiked ? Colors.green : Colors.grey,
+                                ),
+                                onPressed: _toggleLike,
+                              ),
+                              Text(
+                                '$_likeCount',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            ],
                           ),
+                          // Dislike button
                           IconButton(
                             icon: Icon(
                               Icons.thumb_down,
@@ -1069,6 +1509,7 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
                             },
                           ),
                           const SizedBox(width: 10),
+                          // Follow button
                           SizedBox(
                             width: 90,
                             height: 36,
@@ -1172,6 +1613,11 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
                     ),
                   ),
                 ),
+
+                const SizedBox(height: 16),
+
+                // Like Toggle Button with Steps and Information
+                _buildInfoToggleSection(),
               ],
             ),
           );

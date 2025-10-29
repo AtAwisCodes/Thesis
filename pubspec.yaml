@@ -61,6 +61,7 @@ dependencies:
   device_info_plus: ^10.1.0
   image: ^4.0.17
   tflite_flutter: ^0.11.0
+  photo_manager: ^3.5.1
 
 
 dev_dependencies:
@@ -91,8 +92,7 @@ flutter:
     - lib/icons/Loading.gif
     - lib/icons/Landing.png
     - lib/icons/LandPic.png
-    - assets/models/my_model.tflite
-    - assets/label/labels.txt
+    - assets/models/recycle.tflite
     - assets/disposable_email_blocklist.txt
   #   - images/a_dot_ham.jpeg
 

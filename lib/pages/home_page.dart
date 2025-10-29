@@ -5,7 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
-import 'package:rexplore/image_recognition/SimpleYOLOCamera.dart';
+import 'package:rexplore/image_recognition/cameraFunc.dart';
 import 'package:rexplore/pages/favorite_page.dart';
 import 'package:rexplore/pages/notif_page.dart';
 import 'package:rexplore/pages/profile_page.dart';
@@ -140,14 +140,6 @@ class _HomePageState extends State<HomePage> {
                         leading: Icon(Icons.info_outline),
                         title: Text('About Us'),
                       ),
-                      const ListTile(
-                        leading: Icon(Icons.library_books),
-                        title: Text('Library'),
-                      ),
-                      const ListTile(
-                        leading: Icon(Icons.settings),
-                        title: Text('Settings'),
-                      ),
                       ListTile(
                         leading: const Icon(Icons.logout),
                         title: const Text('Logout'),
@@ -162,7 +154,6 @@ class _HomePageState extends State<HomePage> {
 
       body: Column(
         children: [
-          // Show search filter banner when active
           if (page == 0)
             Consumer<YtVideoviewModel>(
               builder: (context, ytVideoViewModel, _) {
@@ -229,8 +220,7 @@ class _HomePageState extends State<HomePage> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) =>
-                            SimpleYOLOCamera(camera: cameras[0]),
+                        builder: (context) => cameraFunc(camera: cameras[0]),
                       ),
                     );
                   } else {
