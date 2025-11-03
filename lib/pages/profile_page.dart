@@ -473,41 +473,45 @@ class _ProfilePageState extends State<ProfilePage> {
         }
 
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+          return const SizedBox(
+            height: 220,
+            child: Center(child: CircularProgressIndicator()),
+          );
         }
 
         if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return const Padding(
-            padding: EdgeInsets.all(16.0),
-            child: Text("You haven't uploaded any videos yet."),
+          return const SizedBox(
+            height: 220,
+            child: Center(
+              child: Text(
+                "You haven't uploaded any videos yet.",
+                style: TextStyle(color: Colors.grey),
+              ),
+            ),
           );
         }
 
         final videos = snapshot.data!;
-        return GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            childAspectRatio: 0.8,
-            crossAxisSpacing: 10,
-            mainAxisSpacing: 10,
+        return SizedBox(
+          height: 220,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            itemCount: videos.length,
+            itemBuilder: (context, index) {
+              final video = videos[index];
+              return GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => FullVideoPlayerPage(video: video),
+                    ),
+                  );
+                },
+                child: _buildVideoCard(video, key: ValueKey(video['id'])),
+              );
+            },
           ),
-          itemCount: videos.length,
-          itemBuilder: (context, index) {
-            final video = videos[index];
-            return GestureDetector(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => FullVideoPlayerPage(video: video),
-                  ),
-                );
-              },
-              child: _buildVideoCard(video, key: ValueKey(video['id'])),
-            );
-          },
         );
       },
     );
@@ -1001,28 +1005,50 @@ class _ProfilePageState extends State<ProfilePage> {
         }
 
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Video deleted successfully")),
+          const SnackBar(
+            content: Text("Video deleted successfully"),
+            backgroundColor: Colors.green,
+          ),
         );
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Error deleting video: $e")),
+          SnackBar(
+            content: Text("Error deleting video: $e"),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
 
     return Container(
       key: key,
+      width: 160,
+      margin: const EdgeInsets.only(right: 16),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
-        color: Colors.black12,
+        color: Theme.of(context).cardColor,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Stack(
         children: [
           Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
+              // Thumbnail with fixed height
+              ClipRRect(
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(16),
+                ),
+                child: Container(
+                  height: 140,
+                  width: double.infinity,
+                  color: Colors.black12,
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
@@ -1044,6 +1070,19 @@ class _ProfilePageState extends State<ProfilePage> {
                               child: const Icon(Icons.videocam,
                                   size: 40, color: Colors.white54),
                             ),
+                      // Dark gradient overlay
+                      Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.transparent,
+                              Colors.black.withOpacity(0.3),
+                            ],
+                          ),
+                        ),
+                      ),
                       // Play button overlay
                       const Center(
                         child: Icon(Icons.play_circle_fill,
@@ -1053,54 +1092,66 @@ class _ProfilePageState extends State<ProfilePage> {
                   ),
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Text(
-                  title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
+              // Title section
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(12.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                          height: 1.3,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
             ],
           ),
+          // Delete button overlay
           Positioned(
-            top: 6,
-            right: 6,
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.6),
-                shape: BoxShape.circle,
-              ),
-              child: IconButton(
-                icon: const Icon(Icons.delete, color: Colors.white, size: 20),
-                onPressed: () {
-                  showDialog(
-                    context: context,
-                    builder: (ctx) => AlertDialog(
-                      title: const Text("Delete Video"),
-                      content: const Text(
-                          "Are you sure you want to delete this video?"),
-                      actions: [
-                        TextButton(
-                          child: const Text("Cancel"),
-                          onPressed: () => Navigator.of(ctx).pop(),
-                        ),
-                        TextButton(
-                          child: const Text("Delete",
-                              style: TextStyle(color: Colors.red)),
-                          onPressed: () {
-                            Navigator.of(ctx).pop();
-                            _deleteVideo();
-                          },
-                        ),
-                      ],
-                    ),
-                  );
-                },
+            top: 8,
+            right: 8,
+            child: GestureDetector(
+              onTap: () {
+                showDialog(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text("Delete Video"),
+                    content: const Text(
+                        "Are you sure you want to delete this video?"),
+                    actions: [
+                      TextButton(
+                        child: const Text("Cancel"),
+                        onPressed: () => Navigator.of(ctx).pop(),
+                      ),
+                      TextButton(
+                        child: const Text("Delete",
+                            style: TextStyle(color: Colors.red)),
+                        onPressed: () {
+                          Navigator.of(ctx).pop();
+                          _deleteVideo();
+                        },
+                      ),
+                    ],
+                  ),
+                );
+              },
+              child: Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.7),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.delete, color: Colors.white, size: 18),
               ),
             ),
           ),
@@ -1122,19 +1173,56 @@ class FullVideoPlayerPage extends StatelessWidget {
     final url = video['publicUrl'] ?? "";
 
     return Scaffold(
-      appBar: AppBar(title: Text(title)),
-      body: Column(
-        children: [
-          Expanded(
-            child: url.isNotEmpty
-                ? VideoPlayerWidget(videoUrl: url)
-                : const Center(child: Icon(Icons.videocam, size: 100)),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Text(description),
-          ),
-        ],
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      appBar: AppBar(
+        title: Text(title),
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        elevation: 0,
+      ),
+      body: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Video player with fixed container
+            Container(
+              height: 250,
+              width: double.infinity,
+              color: Colors.black,
+              child: url.isNotEmpty
+                  ? VideoPlayerWidget(videoUrl: url)
+                  : const Center(
+                      child: Icon(Icons.videocam,
+                          size: 100, color: Colors.white54),
+                    ),
+            ),
+            // Title and description
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  if (description.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      description,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1150,6 +1238,7 @@ class VideoPlayerWidget extends StatefulWidget {
 
 class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
   late VideoPlayerController _controller;
+  bool _showPlayPauseButton = false;
 
   @override
   void initState() {
@@ -1160,7 +1249,10 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
   void _initializeController() {
     _controller = VideoPlayerController.network(widget.videoUrl)
       ..initialize().then((_) {
-        if (mounted) setState(() {});
+        if (mounted) {
+          setState(() {});
+          _controller.play();
+        }
       });
   }
 
@@ -1181,11 +1273,74 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
 
   @override
   Widget build(BuildContext context) {
-    return _controller.value.isInitialized
-        ? AspectRatio(
-            aspectRatio: _controller.value.aspectRatio,
-            child: VideoPlayer(_controller),
-          )
-        : const Center(child: CircularProgressIndicator());
+    if (!_controller.value.isInitialized) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        GestureDetector(
+          onTap: () {
+            setState(() {
+              if (_controller.value.isPlaying) {
+                _controller.pause();
+              } else {
+                _controller.play();
+              }
+              _showPlayPauseButton = true;
+            });
+
+            // Hide the button after 1 second
+            Future.delayed(const Duration(seconds: 1), () {
+              if (mounted) {
+                setState(() {
+                  _showPlayPauseButton = false;
+                });
+              }
+            });
+          },
+          child: _controller.value.aspectRatio > 1
+              ? // Landscape video - fill the space
+              SizedBox.expand(
+                  child: FittedBox(
+                    fit: BoxFit.cover,
+                    child: SizedBox(
+                      width: _controller.value.size.width,
+                      height: _controller.value.size.height,
+                      child: VideoPlayer(_controller),
+                    ),
+                  ),
+                )
+              : // Portrait video - center with aspect ratio
+              Center(
+                  child: AspectRatio(
+                    aspectRatio: _controller.value.aspectRatio,
+                    child: VideoPlayer(_controller),
+                  ),
+                ),
+        ),
+        // Play/Pause button overlay
+        if (_showPlayPauseButton)
+          Center(
+            child: AnimatedOpacity(
+              opacity: _showPlayPauseButton ? 1.0 : 0.0,
+              duration: const Duration(milliseconds: 300),
+              child: Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.6),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  _controller.value.isPlaying ? Icons.pause : Icons.play_arrow,
+                  size: 50,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
   }
 }

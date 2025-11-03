@@ -290,6 +290,7 @@ class VideoUploadService {
     required String description,
     required List<File>? modelImages,
     required File? thumbnailImage,
+    String? disposalCategory,
     required Function(double progress, String status) onProgress,
   }) async {
     try {
@@ -421,6 +422,7 @@ class VideoUploadService {
         'isPublic': true,
         'modelImages': modelImageUrls, //Store model image URLs
         'has3DModel': false, // Will be updated when model is generated
+        'disposalCategory': disposalCategory, // Store disposal category
       };
 
       // Step 10: Save to Firestore

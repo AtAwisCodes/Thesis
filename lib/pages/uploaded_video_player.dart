@@ -11,6 +11,8 @@ import 'package:rexplore/services/video_history_service.dart';
 import 'package:rexplore/services/user_profile_sync_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:rexplore/data/disposal_guides/disposal_categories.dart';
+import 'package:rexplore/components/disposal_trivia_widget.dart';
 
 class UploadedVideoPlayer extends StatefulWidget {
   final String videoUrl;
@@ -64,6 +66,7 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
   bool _showPlayPauseButton = false;
   String _videoDescription = '';
   String _selectedTab = 'Steps'; // Track selected tab: 'Steps' or 'Information'
+  Map<String, dynamic>? _videoData;
 
   @override
   void initState() {
@@ -116,6 +119,13 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
       if (videoDoc.exists) {
         final data = videoDoc.data()!;
         _uploaderUserId = data['userId'] as String?;
+
+        // Store video data for later use (including disposal category)
+        if (mounted) {
+          setState(() {
+            _videoData = data;
+          });
+        }
 
         // Load video description if available
         if (data.containsKey('description')) {
@@ -1119,11 +1129,11 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
           // Content area - Scrollable
           Container(
             constraints: const BoxConstraints(
-              maxHeight: 300, // Maximum height for scrollable content
-              minHeight: 150, // Minimum height
+              maxHeight: 250, // Maximum height for scrollable content
+              minHeight: 120, // Minimum height
             ),
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(12),
               child: _selectedTab == 'Steps'
                   ? _buildStepsContent()
                   : _buildInformationContent(),
@@ -1226,52 +1236,48 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
     );
   }
 
-  // Build Information tab content
+  // Build Information tab content (Trivia - Disposal Guide)
   Widget _buildInformationContent() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [],
-    );
-  }
+    // Get disposal category from video data
+    final categoryString = _videoData?['disposalCategory'] as String?;
 
-  // Build a single information row
-  Widget _buildInfoRow(IconData icon, String label, String value) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(
-          icon,
-          size: 20,
-          color: const Color(0xff5BEC84),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
+    if (categoryString == null || categoryString.isEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade100,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.info_outline, color: Colors.grey.shade600),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'No disposal information available for this video.',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey.shade700,
+                    ),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                value,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Theme.of(context)
-                      .textTheme
-                      .bodyMedium
-                      ?.color
-                      ?.withOpacity(0.7),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-      ],
+        ],
+      );
+    }
+
+    // Convert string to category
+    final category = DisposalCategoryExtension.fromString(categoryString);
+
+    // Display the disposal trivia widget
+    return DisposalTriviaWidget(
+      category: category,
+      showFullInfo: true,
     );
   }
 

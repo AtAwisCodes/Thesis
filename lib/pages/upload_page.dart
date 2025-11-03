@@ -7,6 +7,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:camera/camera.dart';
+import 'package:rexplore/data/disposal_guides/disposal_categories.dart';
 
 class UploadPage extends StatefulWidget {
   const UploadPage({super.key});
@@ -409,6 +410,7 @@ class _VideoDetailsScreenState extends State<VideoDetailsScreen> {
 
   final VideoUploadService _uploadService = VideoUploadService();
   Map<String, dynamic>? _userData;
+  DisposalCategory? _selectedCategory;
 
   @override
   void initState() {
@@ -674,6 +676,192 @@ class _VideoDetailsScreenState extends State<VideoDetailsScreen> {
 
               SizedBox(height: screenHeight * 0.02),
 
+              // Disposal Category Section - Beautiful Horizontal Scroll
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        "Category",
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.primary.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          "Required",
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: theme.colorScheme.primary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    height: 100,
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      physics: const BouncingScrollPhysics(),
+                      itemCount: DisposalCategory.values.length,
+                      itemBuilder: (context, index) {
+                        final category = DisposalCategory.values[index];
+                        final isSelected = _selectedCategory == category;
+
+                        return GestureDetector(
+                          onTap: _isUploading
+                              ? null
+                              : () {
+                                  setState(() {
+                                    _selectedCategory = category;
+                                  });
+                                },
+                          child: Container(
+                            width: 85,
+                            margin: EdgeInsets.only(
+                              right: 12,
+                              left: index == 0 ? 0 : 0,
+                            ),
+                            decoration: BoxDecoration(
+                              gradient: isSelected
+                                  ? LinearGradient(
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                      colors: [
+                                        theme.colorScheme.primary,
+                                        theme.colorScheme.primary
+                                            .withOpacity(0.8),
+                                      ],
+                                    )
+                                  : null,
+                              color:
+                                  isSelected ? null : theme.colorScheme.surface,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: isSelected
+                                    ? theme.colorScheme.primary
+                                    : theme.dividerColor,
+                                width: isSelected ? 2 : 1.5,
+                              ),
+                              boxShadow: isSelected
+                                  ? [
+                                      BoxShadow(
+                                        color: theme.colorScheme.primary
+                                            .withOpacity(0.3),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 4),
+                                      )
+                                    ]
+                                  : [],
+                            ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  category.icon,
+                                  style: TextStyle(
+                                    fontSize: isSelected ? 32 : 28,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 4,
+                                  ),
+                                  child: Text(
+                                    category.name,
+                                    textAlign: TextAlign.center,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: isSelected
+                                          ? FontWeight.bold
+                                          : FontWeight.w500,
+                                      color: isSelected
+                                          ? Colors.white
+                                          : theme.textTheme.bodyMedium?.color,
+                                      height: 1.2,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  if (_selectedCategory != null) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            theme.colorScheme.primary.withOpacity(0.1),
+                            theme.colorScheme.primary.withOpacity(0.05),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: theme.colorScheme.primary.withOpacity(0.3),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(
+                              Icons.check_circle,
+                              size: 16,
+                              color: theme.colorScheme.primary,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              '${_selectedCategory!.name} selected',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: theme.colorScheme.primary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+
+              SizedBox(height: screenHeight * 0.02),
+
               // Thumbnail Section
               Row(
                 mainAxisAlignment: MainAxisAlignment.start,
@@ -935,6 +1123,11 @@ class _VideoDetailsScreenState extends State<VideoDetailsScreen> {
       return;
     }
 
+    if (_selectedCategory == null) {
+      _showError("Please select a disposal category");
+      return;
+    }
+
     setState(() {
       _isUploading = true;
       _uploadProgress = 0.0;
@@ -952,6 +1145,7 @@ class _VideoDetailsScreenState extends State<VideoDetailsScreen> {
         description: _descriptionController.text.trim(),
         modelImages: imageFiles,
         thumbnailImage: thumbnailFile,
+        disposalCategory: _selectedCategory?.value,
         onProgress: (progress, status) {
           setState(() {
             _uploadProgress = progress;
