@@ -8,6 +8,7 @@ class EmailVerification {
     try {
       // Fetch sign-in methods for the email
       final List<String> signInMethods =
+          // ignore: deprecated_member_use
           await FirebaseAuth.instance.fetchSignInMethodsForEmail(email);
 
       // If the list is empty, email is available

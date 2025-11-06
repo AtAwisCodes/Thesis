@@ -51,6 +51,19 @@ class _LoginPageState extends State<LoginPage> {
         return;
       }
 
+      // Check if account is deleted
+      if (userCredential.user != null) {
+        try {
+          await AuthService().checkAccountStatus(userCredential.user!);
+        } catch (e) {
+          // Account is deleted, show error
+          if (mounted) {
+            showErrorMessage(e.toString());
+          }
+          return;
+        }
+      }
+
       // Close the login dialog - AuthPage StreamBuilder will handle navigation
       if (mounted) {
         Navigator.of(context).pop();
@@ -279,6 +292,7 @@ class _LoginPageState extends State<LoginPage> {
                   controller: emailController,
                   hintText: 'Email',
                   obscureText: false,
+                  enforceLimit: false, // No character limit on login
                 ),
                 SizedBox(height: screenHeight * 0.015),
 
@@ -287,6 +301,7 @@ class _LoginPageState extends State<LoginPage> {
                   controller: passwordController,
                   hintText: 'Password',
                   obscureText: true,
+                  enforceLimit: false, // No character limit on login
                 ),
                 SizedBox(height: screenHeight * 0.015),
 

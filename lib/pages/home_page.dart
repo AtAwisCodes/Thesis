@@ -33,12 +33,58 @@ class _HomePageState extends State<HomePage> {
   User? get currentUser => FirebaseAuth.instance.currentUser;
 
   void signUserOut() async {
-    // Clear any cached data before signing out
-    final ytVideoViewModel =
-        Provider.of<YtVideoviewModel>(context, listen: false);
-    ytVideoViewModel.reset();
+    // Show confirmation dialog
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.logout, color: Colors.orange),
+              SizedBox(width: 8),
+              Text('Logout Confirmation'),
+            ],
+          ),
+          content: const Text(
+            'Are you sure you want to logout?',
+            style: TextStyle(fontSize: 16),
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(color: Colors.grey),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text('Logout'),
+            ),
+          ],
+        );
+      },
+    );
 
-    await AuthService().signOut();
+    // If user confirmed, proceed with logout
+    if (confirmed == true) {
+      // Clear any cached data before signing out
+      final ytVideoViewModel =
+          Provider.of<YtVideoviewModel>(context, listen: false);
+      ytVideoViewModel.reset();
+
+      await AuthService().signOut();
+    }
   }
 
   @override

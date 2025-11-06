@@ -26,11 +26,19 @@ android {
         targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        multiDexEnabled true  // Fix for multiple video player packages
     }
 
     buildTypes {
         release {
             signingConfig = signingConfigs.debug
+            // Enable ProGuard rules to keep WebView classes
+            minifyEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+        debug {
+            // Disable minification in debug for faster builds
+            minifyEnabled false
         }
     }
 }
@@ -41,4 +49,10 @@ flutter {
 dependencies{
     implementation platform('com.google.firebase:firebase-bom:34.4.0')
     implementation 'com.google.firebase:firebase-analytics'
+    
+    // Add explicit WebView dependency to fix youtube_player + video_player conflict
+    implementation 'androidx.webkit:webkit:1.8.0'
+    
+    // Add multidex support
+    implementation 'androidx.multidex:multidex:2.0.1'
 }

@@ -10,6 +10,27 @@ class UploadedVideoCard extends StatelessWidget {
 
   UploadedVideoCard({super.key, required this.videos});
 
+  /// Format view count for display
+  String _formatViewCount(dynamic viewCount) {
+    // If it's already a string (from YouTube), return as-is
+    if (viewCount is String) return viewCount;
+
+    // If it's a number, format it
+    if (viewCount is int) {
+      if (viewCount >= 1000000000) {
+        return '${(viewCount / 1000000000).toStringAsFixed(1)}B';
+      } else if (viewCount >= 1000000) {
+        return '${(viewCount / 1000000).toStringAsFixed(1)}M';
+      } else if (viewCount >= 1000) {
+        return '${(viewCount / 1000).toStringAsFixed(1)}K';
+      } else {
+        return viewCount.toString();
+      }
+    }
+
+    return '0';
+  }
+
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
@@ -136,16 +157,53 @@ class UploadedVideoCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Title
-                      Text(
-                        title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
-                          fontSize: screenWidth * 0.045,
-                        ),
+                      // Title with User Upload tag
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              title,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                                fontSize: screenWidth * 0.045,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.blue,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.person,
+                                  color: Colors.white,
+                                  size: 14,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'User',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: screenWidth * 0.028,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
 
                       SizedBox(height: screenHeight * 0.008),
@@ -179,7 +237,7 @@ class UploadedVideoCard extends StatelessWidget {
                               size: 16, color: Colors.white54),
                           const SizedBox(width: 4),
                           Text(
-                            "$views",
+                            _formatViewCount(views),
                             style: TextStyle(
                               color: Colors.white54,
                               fontSize: screenWidth * 0.032,

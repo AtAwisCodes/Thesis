@@ -37,6 +37,9 @@ class AuthService {
       // Check if this is a new user and create Firestore document
       if (userCredential.additionalUserInfo?.isNewUser ?? false) {
         await _createUserDocument(userCredential.user!);
+      } else {
+        // For existing users, check if account is deleted
+        await checkAccountStatus(userCredential.user!);
       }
 
       return userCredential;
@@ -72,6 +75,29 @@ class AuthService {
     }
   }
 
+  /// Check if user account is deleted or suspended
+  Future<void> checkAccountStatus(User user) async {
+    try {
+      // Check in 'users' collection first (admin management)
+      final userDoc = await _firestore.collection('users').doc(user.uid).get();
+
+      if (userDoc.exists) {
+        final userData = userDoc.data()!;
+        final isDeleted = userData['isDeleted'] ?? false;
+
+        if (isDeleted) {
+          // Sign out immediately
+          await FirebaseAuth.instance.signOut();
+          throw Exception(
+              'This account has been deleted by administrators. Please contact support if you believe this is an error.');
+        }
+      }
+    } catch (e) {
+      print('Error checking account status: $e');
+      rethrow;
+    }
+  }
+
   /// Create user document in Firestore for Google sign-in users
   Future<void> _createUserDocument(User user) async {
     try {
@@ -97,6 +123,16 @@ class AuthService {
       };
 
       await _firestore.collection('count').doc(user.uid).set(userData);
+
+      // Also create initial user document in 'users' collection for admin management
+      await _firestore.collection('users').doc(user.uid).set({
+        'displayName': user.displayName ?? '',
+        'email': user.email ?? '',
+        'avatarUrl': user.photoURL ?? '',
+        'createdAt': FieldValue.serverTimestamp(),
+        'isSuspended': false,
+        'isDeleted': false,
+      });
     } catch (e) {
       print('Error creating user document: $e');
       rethrow;

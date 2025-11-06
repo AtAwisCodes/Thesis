@@ -8,6 +8,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:camera/camera.dart';
 import 'package:rexplore/data/disposal_guides/disposal_categories.dart';
+import 'package:rexplore/components/recycle_gif_loader.dart';
 
 class UploadPage extends StatefulWidget {
   const UploadPage({super.key});
@@ -281,9 +282,14 @@ class _CameraRecordScreenState extends State<CameraRecordScreen> {
   @override
   Widget build(BuildContext context) {
     if (!_isInitialized || _cameraController == null) {
-      return const Scaffold(
+      return Scaffold(
         backgroundColor: Colors.black,
-        body: Center(child: CircularProgressIndicator()),
+        body: Center(
+          child: RecycleGifLoader(
+            size: 80,
+            text: 'Loading camera...',
+          ),
+        ),
       );
     }
 
@@ -404,6 +410,7 @@ class _VideoDetailsScreenState extends State<VideoDetailsScreen> {
 
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
+  final TextEditingController _stepsController = TextEditingController();
   final ImagePicker _picker = ImagePicker();
   final List<XFile> _selectedImages = [];
   XFile? _thumbnailImage;
@@ -433,13 +440,45 @@ class _VideoDetailsScreenState extends State<VideoDetailsScreen> {
   }
 
   @override
+  void deactivate() {
+    // Pause video when navigating away
+    if (_videoController?.value.isInitialized ?? false) {
+      _videoController?.pause();
+    }
+    super.deactivate();
+  }
+
+  @override
   void dispose() {
     ScaffoldMessenger.of(context).clearSnackBars();
     _videoController?.dispose();
     _hideControlsTimer?.cancel();
     _titleController.dispose();
     _descriptionController.dispose();
+    _stepsController.dispose();
     super.dispose();
+  }
+
+  Future<void> _replaceVideo() async {
+    try {
+      final XFile? video = await _picker.pickVideo(source: ImageSource.gallery);
+      if (video != null) {
+        // Dispose old controller
+        _videoController?.dispose();
+
+        // Navigate to new VideoDetailsScreen with the new video
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => VideoDetailsScreen(videoPath: video.path),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      _showError("Error replacing video: $e");
+    }
   }
 
   Future<void> _pickThumbnail() async {
@@ -552,13 +591,97 @@ class _VideoDetailsScreenState extends State<VideoDetailsScreen> {
                                 ),
                               ),
                             ),
+                            // Replace Video Button
+                            Positioned(
+                              top: 8,
+                              right: 8,
+                              child: Material(
+                                color: Colors.transparent,
+                                child: InkWell(
+                                  onTap: _isUploading ? null : _replaceVideo,
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 8,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black.withOpacity(0.7),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: Colors.white.withOpacity(0.3),
+                                        width: 1,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: const [
+                                        Icon(
+                                          Icons.refresh,
+                                          color: Colors.white,
+                                          size: 18,
+                                        ),
+                                        SizedBox(width: 4),
+                                        Text(
+                                          'Replace',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
                           ],
                         ),
                       )
-                    : const Center(child: CircularProgressIndicator()),
+                    : Center(
+                        child: RecycleGifLoader(
+                          size: 80,
+                          text: 'Loading video preview...',
+                        ),
+                      ),
               ),
 
-              SizedBox(height: screenHeight * 0.03),
+              SizedBox(height: screenHeight * 0.02),
+
+              // Video file size info
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: theme.colorScheme.primary.withOpacity(0.3),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.info_outline,
+                      size: 16,
+                      color: theme.colorScheme.primary,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Max video size: 2GB. Supports HD videos up to 10-15 minutes.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: theme.colorScheme.onSurface.withOpacity(0.7),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              SizedBox(height: screenHeight * 0.02),
 
               // Upload Progress Section
               if (_isUploading) ...[
@@ -575,16 +698,7 @@ class _VideoDetailsScreenState extends State<VideoDetailsScreen> {
                     children: [
                       Row(
                         children: [
-                          SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                theme.colorScheme.primary,
-                              ),
-                            ),
-                          ),
+                          CompactRecycleLoader(size: 20),
                           const SizedBox(width: 12),
                           Text(
                             'Uploading...',
@@ -654,9 +768,14 @@ class _VideoDetailsScreenState extends State<VideoDetailsScreen> {
               TextField(
                 controller: _titleController,
                 enabled: !_isUploading,
-                decoration: const InputDecoration(
+                maxLength: 100,
+                decoration: InputDecoration(
                   hintText: "Create a title (type @ to mention a channel)",
                   border: InputBorder.none,
+                  counterStyle: TextStyle(
+                    color: Colors.grey[600],
+                    fontSize: 12,
+                  ),
                 ),
                 maxLines: 2,
               ),
@@ -667,10 +786,35 @@ class _VideoDetailsScreenState extends State<VideoDetailsScreen> {
               TextField(
                 controller: _descriptionController,
                 enabled: !_isUploading,
-                decoration: const InputDecoration(
+                maxLength: 2000,
+                decoration: InputDecoration(
                   hintText: "Add description",
                   border: InputBorder.none,
-                  prefixIcon: Icon(Icons.menu),
+                  prefixIcon: const Icon(Icons.menu),
+                  counterStyle: TextStyle(
+                    color: Colors.grey[600],
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+
+              const Divider(),
+
+              // Steps input
+              TextField(
+                controller: _stepsController,
+                enabled: !_isUploading,
+                maxLines: 5,
+                maxLength: 3000,
+                decoration: InputDecoration(
+                  hintText:
+                      "Add steps (separate each step with a new line)\nExample:\nStep 1: Do this\nStep 2: Do that\nStep 3: Final step",
+                  border: InputBorder.none,
+                  prefixIcon: const Icon(Icons.format_list_numbered),
+                  counterStyle: TextStyle(
+                    color: Colors.grey[600],
+                    fontSize: 12,
+                  ),
                 ),
               ),
 
@@ -1139,6 +1283,13 @@ class _VideoDetailsScreenState extends State<VideoDetailsScreen> {
       final thumbnailFile =
           _thumbnailImage != null ? File(_thumbnailImage!.path) : null;
 
+      // Parse steps from text input (split by newlines and filter empty lines)
+      final List<String> steps = _stepsController.text
+          .split('\n')
+          .map((s) => s.trim())
+          .where((s) => s.isNotEmpty)
+          .toList();
+
       final result = await _uploadService.uploadVideoWithProgress(
         videoPath: widget.videoPath,
         title: _titleController.text.trim(),
@@ -1146,6 +1297,7 @@ class _VideoDetailsScreenState extends State<VideoDetailsScreen> {
         modelImages: imageFiles,
         thumbnailImage: thumbnailFile,
         disposalCategory: _selectedCategory?.value,
+        customSteps: steps.isNotEmpty ? steps : null,
         onProgress: (progress, status) {
           setState(() {
             _uploadProgress = progress;

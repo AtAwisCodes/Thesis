@@ -102,8 +102,8 @@ class _DisposalTriviaWidgetState extends State<DisposalTriviaWidget> {
         Text(
           info.description,
           style: const TextStyle(fontSize: 12, height: 1.4),
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
+          maxLines: _isExpanded ? null : 2,
+          overflow: _isExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
         ),
         const SizedBox(height: 10),
 
@@ -113,6 +113,7 @@ class _DisposalTriviaWidgetState extends State<DisposalTriviaWidget> {
           title: 'Impact',
           content: info.environmentalImpact,
           color: const Color(0xff5BEC84),
+          isExpanded: _isExpanded,
         ),
         const SizedBox(height: 8),
         _buildCompactInfoBox(
@@ -120,6 +121,7 @@ class _DisposalTriviaWidgetState extends State<DisposalTriviaWidget> {
           title: 'Tip',
           content: info.funFact,
           color: Colors.orange,
+          isExpanded: _isExpanded,
         ),
 
         // Expandable detailed info
@@ -169,8 +171,12 @@ class _DisposalTriviaWidgetState extends State<DisposalTriviaWidget> {
             _buildCompactCheckList('Do\'s ✓', info.dosList, true),
             const SizedBox(height: 10),
             _buildCompactCheckList('Don\'ts ✗', info.dontsList, false),
+            const SizedBox(
+                height: 20), // Extra bottom padding to prevent cutoff
           ],
         ],
+        // Additional bottom spacing to ensure visibility on all screens
+        if (!_isExpanded) const SizedBox(height: 8),
       ],
     );
   }
@@ -180,6 +186,7 @@ class _DisposalTriviaWidgetState extends State<DisposalTriviaWidget> {
     required String title,
     required String content,
     required Color color,
+    bool isExpanded = false,
   }) {
     return Container(
       padding: const EdgeInsets.all(8),
@@ -212,8 +219,9 @@ class _DisposalTriviaWidgetState extends State<DisposalTriviaWidget> {
                     color: Colors.grey.shade700,
                     height: 1.3,
                   ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
+                  maxLines: isExpanded ? null : 2,
+                  overflow:
+                      isExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
                 ),
               ],
             ),

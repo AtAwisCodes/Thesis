@@ -13,6 +13,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:rexplore/data/disposal_guides/disposal_categories.dart';
 import 'package:rexplore/components/disposal_trivia_widget.dart';
+import 'package:rexplore/components/report_video_dialog.dart';
 
 class UploadedVideoPlayer extends StatefulWidget {
   final String videoUrl;
@@ -534,6 +535,15 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
   }
 
   @override
+  void deactivate() {
+    // Pause video when navigating away or when widget is deactivated
+    if (_controller.value.isInitialized) {
+      _controller.pause();
+    }
+    super.deactivate();
+  }
+
+  @override
   void dispose() {
     // Clear any active snackbars when leaving this page
     ScaffoldMessenger.of(context).clearSnackBars();
@@ -663,6 +673,7 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
       "firstName": widget.firstName,
       "lastName": widget.lastName,
       "views": _viewCount,
+      "videoType": "user_uploaded",
     };
 
     setState(() {
@@ -981,6 +992,9 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
                                 child: TextField(
                                   controller: _dialogCommentController,
                                   style: TextStyle(color: textColor),
+                                  maxLength: 500,
+                                  maxLines: 3,
+                                  minLines: 1,
                                   decoration: InputDecoration(
                                     hintText: "Write a comment...",
                                     hintStyle: TextStyle(
@@ -993,6 +1007,7 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
                                         color: textColor.withOpacity(0.4),
                                       ),
                                     ),
+                                    counterText: '',
                                   ),
                                 ),
                               ),
@@ -1126,18 +1141,32 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
             ),
           ),
 
-          // Content area - Scrollable
-          Container(
-            constraints: const BoxConstraints(
-              maxHeight: 250, // Maximum height for scrollable content
-              minHeight: 120, // Minimum height
-            ),
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(12),
-              child: _selectedTab == 'Steps'
-                  ? _buildStepsContent()
-                  : _buildInformationContent(),
-            ),
+          // Content area - Scrollable and responsive
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final screenHeight = MediaQuery.of(context).size.height;
+              // Make max height responsive: 40% of screen height but not less than 300 or more than 600
+              final responsiveMaxHeight =
+                  (screenHeight * 0.4).clamp(300.0, 600.0);
+
+              return Container(
+                constraints: BoxConstraints(
+                  maxHeight: responsiveMaxHeight,
+                  minHeight: 120,
+                ),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.only(
+                    left: 12,
+                    right: 12,
+                    top: 12,
+                    bottom: 24, // Extra bottom padding to prevent cutoff
+                  ),
+                  child: _selectedTab == 'Steps'
+                      ? _buildStepsContent()
+                      : _buildInformationContent(),
+                ),
+              );
+            },
           ),
         ],
       ),
@@ -1146,6 +1175,29 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
 
   /// Build Steps tab content
   Widget _buildStepsContent() {
+    // Get custom steps from video data
+    final customSteps = _videoData?['customSteps'] as List<dynamic>?;
+
+    // If custom steps exist, display them
+    if (customSteps != null && customSteps.isNotEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: List.generate(customSteps.length, (index) {
+          final step = customSteps[index].toString();
+          return Column(
+            children: [
+              _buildStepItemSimple(
+                index + 1,
+                step,
+              ),
+              if (index < customSteps.length - 1) const SizedBox(height: 12),
+            ],
+          );
+        }),
+      );
+    }
+
+    // Default steps if no custom steps provided
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1182,7 +1234,7 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
     );
   }
 
-  /// Build a single step item
+  /// Build a single step item with title and description
   Widget _buildStepItem(int stepNumber, String title, String description) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1236,6 +1288,43 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
     );
   }
 
+  /// Build a simple step item (for custom steps)
+  Widget _buildStepItemSimple(int stepNumber, String stepText) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: const Color(0xff5BEC84),
+            shape: BoxShape.circle,
+          ),
+          child: Center(
+            child: Text(
+              '$stepNumber',
+              style: const TextStyle(
+                color: Colors.black,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            stepText,
+            style: const TextStyle(
+              fontSize: 14,
+              height: 1.4,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   // Build Information tab content (Trivia - Disposal Guide)
   Widget _buildInformationContent() {
     // Get disposal category from video data
@@ -1281,12 +1370,57 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
     );
   }
 
-  @override
+  Future<void> _showReportDialog(
+      BuildContext context, String uploaderName, String uploaderEmail) async {
+    showDialog(
+      context: context,
+      builder: (context) => ReportVideoDialog(
+        videoId: widget.videoId,
+        videoTitle: widget.title,
+        videoUrl: widget.videoUrl,
+        uploaderId: _uploaderUserId ?? '',
+        uploaderName: uploaderName,
+        uploaderEmail: uploaderEmail,
+        thumbnailUrl: widget.thumbnailUrl,
+      ),
+    );
+  }
+
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         elevation: 0,
         backgroundColor: Colors.transparent,
+        actions: [
+          // Report button
+          IconButton(
+            icon: const Icon(Icons.flag_outlined),
+            color: Colors.red[700],
+            tooltip: 'Report Video',
+            onPressed: () async {
+              // Get uploader info for report
+              final uploaderDoc = _uploaderUserId != null
+                  ? await _firestore
+                      .collection('count')
+                      .doc(_uploaderUserId)
+                      .get()
+                  : null;
+
+              String uploaderName =
+                  '${widget.firstName} ${widget.lastName}'.trim();
+              String uploaderEmail = '';
+
+              if (uploaderDoc != null && uploaderDoc.exists) {
+                final data = uploaderDoc.data()!;
+                uploaderEmail = data['email'] ?? '';
+              }
+
+              if (mounted) {
+                _showReportDialog(context, uploaderName, uploaderEmail);
+              }
+            },
+          ),
+        ],
       ),
       body: StreamBuilder<Map<String, dynamic>?>(
         stream: _uploaderUserId != null
@@ -1395,7 +1529,25 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
                             ),
                           ],
                         )
-                      : const Center(child: CircularProgressIndicator()),
+                      : const Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              CircularProgressIndicator(
+                                color: Color(0xff5BEC84),
+                              ),
+                              SizedBox(height: 16),
+                              Text(
+                                'Loading video...',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.white70,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                 ),
                 // Title
                 Padding(

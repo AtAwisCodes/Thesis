@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:rexplore/services/favorites_manager.dart';
@@ -18,6 +19,27 @@ class _FavoritePageState extends State<FavoritePage> {
   final FavoritesManager _manager = FavoritesManager.instance;
   final UserProfileSyncService _profileSyncService = UserProfileSyncService();
 
+  /// Format view count for display
+  String _formatViewCount(dynamic viewCount) {
+    // If it's already a string (from YouTube), return as-is
+    if (viewCount is String) return viewCount;
+
+    // If it's a number, format it
+    if (viewCount is int) {
+      if (viewCount >= 1000000000) {
+        return '${(viewCount / 1000000000).toStringAsFixed(1)}B';
+      } else if (viewCount >= 1000000) {
+        return '${(viewCount / 1000000).toStringAsFixed(1)}M';
+      } else if (viewCount >= 1000) {
+        return '${(viewCount / 1000).toStringAsFixed(1)}K';
+      } else {
+        return viewCount.toString();
+      }
+    }
+
+    return '0';
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -35,9 +57,13 @@ class _FavoritePageState extends State<FavoritePage> {
                   itemBuilder: (context, index) {
                     final video = sampleVideos[index];
 
-                    // Detect uploaded vs YouTube videos
-                    if (video.containsKey("url") ||
-                        video.containsKey("publicUrl")) {
+                    // Detect uploaded vs YouTube videos using videoType tag
+                    final videoType = video["videoType"] ?? "";
+
+                    if (videoType == "user_uploaded" ||
+                        (videoType.isEmpty &&
+                            (video.containsKey("url") ||
+                                video.containsKey("publicUrl")))) {
                       // Uploaded video card
                       return _uploadedVideoCard(video);
                     } else {
@@ -86,10 +112,40 @@ class _FavoritePageState extends State<FavoritePage> {
   /// YouTube video card
   Widget _youtubeVideoCard(String videoId, String title, String channel,
       String thumbnail, String views) {
-    YoutubePlayerController controller = YoutubePlayerController(
-      initialVideoId: videoId,
-      flags: const YoutubePlayerFlags(autoPlay: false, mute: false),
-    );
+    late YoutubePlayerController controller;
+
+    // Wrap in error zone to catch type errors from YouTube player
+    runZonedGuarded(() {
+      controller = YoutubePlayerController(
+        initialVideoId: videoId,
+        flags: const YoutubePlayerFlags(
+          autoPlay: false,
+          mute: false,
+          enableCaption: false,
+        ),
+      );
+
+      // Add error listener with try-catch
+      controller.addListener(() {
+        try {
+          if (controller.value.hasError && mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Video error: ${controller.value.errorCode}. Video may be restricted.',
+                ),
+                duration: const Duration(seconds: 3),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        } catch (e) {
+          print('YouTube player error in favorites: $e');
+        }
+      });
+    }, (error, stack) {
+      print('YouTube player initialization error: $error');
+    });
 
     return InkWell(
       onTap: () {
@@ -299,7 +355,7 @@ class _FavoritePageState extends State<FavoritePage> {
                               size: 16, color: Colors.white54),
                           const SizedBox(width: 4),
                           Text(
-                            "$views",
+                            _formatViewCount(views),
                             style: TextStyle(
                               color: Colors.white54,
                               fontSize: screenWidth * 0.032,

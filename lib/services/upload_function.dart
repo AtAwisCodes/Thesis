@@ -291,6 +291,7 @@ class VideoUploadService {
     required List<File>? modelImages,
     required File? thumbnailImage,
     String? disposalCategory,
+    List<String>? customSteps,
     required Function(double progress, String status) onProgress,
   }) async {
     try {
@@ -301,6 +302,50 @@ class VideoUploadService {
         return VideoUploadResult.failure("User not authenticated");
       }
 
+      // Step 1.5: Check if user is suspended or deleted
+      onProgress(0.07, 'Checking account status...');
+      final userDoc = await _firestore.collection('users').doc(user.uid).get();
+
+      if (userDoc.exists) {
+        final userData = userDoc.data()!;
+
+        // Check if user is deleted
+        final isDeleted = userData['isDeleted'] ?? false;
+        if (isDeleted) {
+          return VideoUploadResult.failure(
+              "Your account has been deleted by administrators. You cannot upload videos.");
+        }
+
+        // Check if user is suspended
+        final isSuspended = userData['isSuspended'] ?? false;
+        if (isSuspended) {
+          final suspensionReason =
+              userData['suspensionReason'] ?? 'Community guideline violations';
+          final suspensionEndDate = userData['suspensionEndDate'] as Timestamp?;
+
+          // Check if suspension has expired
+          if (suspensionEndDate != null) {
+            final endDate = suspensionEndDate.toDate();
+            if (DateTime.now().isAfter(endDate)) {
+              // Auto-unsuspend
+              await _firestore.collection('users').doc(user.uid).update({
+                'isSuspended': false,
+              });
+              // Allow upload to continue
+            } else {
+              // Still suspended
+              final daysLeft = endDate.difference(DateTime.now()).inDays + 1;
+              return VideoUploadResult.failure(
+                  "Your account is suspended for $daysLeft more day(s). Reason: $suspensionReason");
+            }
+          } else {
+            // No end date specified, account is permanently suspended
+            return VideoUploadResult.failure(
+                "Your account is suspended. Reason: $suspensionReason");
+          }
+        }
+      }
+
       // Step 2: Validate file
       onProgress(0.1, 'Validating video file...');
       final file = File(videoPath);
@@ -309,10 +354,17 @@ class VideoUploadService {
       }
 
       final fileSize = await file.length();
-      const maxFileSize = 100 * 1024 * 1024; // 100MB limit
+      const maxFileSize =
+          2 * 1024 * 1024 * 1024; // 2GB limit (supports longer HD videos)
       if (fileSize > maxFileSize) {
-        return VideoUploadResult.failure("File size exceeds 100MB limit");
+        final fileSizeMB = (fileSize / (1024 * 1024)).toStringAsFixed(2);
+        return VideoUploadResult.failure(
+            "File size ($fileSizeMB MB) exceeds 2GB limit. Please compress your video.");
       }
+
+      // Log file size for debugging
+      final fileSizeMB = (fileSize / (1024 * 1024)).toStringAsFixed(2);
+      print('Video file size: $fileSizeMB MB');
 
       // Step 3: Upload thumbnail image if provided
       String thumbnailUrl = '';
@@ -350,26 +402,56 @@ class VideoUploadService {
       var fileName = '${_uuid.v4()}$fileExtension';
       var filePath = '${user.uid}/$fileName';
 
-      // Step 6: Upload video to Supabase Storage
+      // Step 6: Upload video to Supabase Storage with timeout and retry
       onProgress(0.4, 'Uploading video to storage...');
       try {
-        await _supabase.storage
-            .from('videos')
-            .upload(filePath, File(videoPath));
+        // Use upsert to handle conflicts and set longer timeout
+        await _supabase.storage.from('videos').upload(
+              filePath,
+              File(videoPath),
+              fileOptions: const FileOptions(
+                cacheControl: '3600',
+                upsert: true, // Overwrite if exists
+              ),
+            );
       } catch (e) {
+        print('Upload error: $e');
+
+        // Handle specific error cases
         if (e.toString().contains('already exists')) {
-          final newFileName =
-              '${_uuid.v4()}_${DateTime.now().millisecondsSinceEpoch}$fileExtension';
-          final newFilePath = '${user.uid}/$newFileName';
+          try {
+            final newFileName =
+                '${_uuid.v4()}_${DateTime.now().millisecondsSinceEpoch}$fileExtension';
+            final newFilePath = '${user.uid}/$newFileName';
 
-          await _supabase.storage
-              .from('videos')
-              .upload(newFilePath, File(videoPath));
+            await _supabase.storage.from('videos').upload(
+                  newFilePath,
+                  File(videoPath),
+                  fileOptions: const FileOptions(
+                    cacheControl: '3600',
+                    upsert: true,
+                  ),
+                );
 
-          fileName = newFileName;
-          filePath = newFilePath;
+            fileName = newFileName;
+            filePath = newFilePath;
+          } catch (retryError) {
+            print('Retry upload failed: $retryError');
+            return VideoUploadResult.failure(
+                'Failed to upload video after retry: ${retryError.toString()}');
+          }
+        } else if (e.toString().contains('Payload') ||
+            e.toString().contains('size') ||
+            e.toString().contains('limit')) {
+          return VideoUploadResult.failure(
+              'Video file is too large for upload. Please compress your video or use a shorter duration.');
+        } else if (e.toString().contains('timeout') ||
+            e.toString().contains('network')) {
+          return VideoUploadResult.failure(
+              'Upload timeout. Please check your internet connection and try again.');
         } else {
-          throw e;
+          return VideoUploadResult.failure(
+              'Upload failed: ${e.toString()}. Please try again.');
         }
       }
       onProgress(0.6, 'Video uploaded. Getting URL...');
@@ -423,6 +505,7 @@ class VideoUploadService {
         'modelImages': modelImageUrls, //Store model image URLs
         'has3DModel': false, // Will be updated when model is generated
         'disposalCategory': disposalCategory, // Store disposal category
+        'customSteps': customSteps, // Store custom steps
       };
 
       // Step 10: Save to Firestore

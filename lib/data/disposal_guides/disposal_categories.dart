@@ -3,11 +3,8 @@
 
 enum DisposalCategory {
   plasticBottles,
-  tires,
-  rubberBands,
   cans,
   cartons,
-  paper,
   unusedClothes,
 }
 
@@ -16,16 +13,10 @@ extension DisposalCategoryExtension on DisposalCategory {
     switch (this) {
       case DisposalCategory.plasticBottles:
         return 'Plastic Bottles';
-      case DisposalCategory.tires:
-        return 'Tires';
-      case DisposalCategory.rubberBands:
-        return 'Rubber Bands';
       case DisposalCategory.cans:
         return 'Cans';
       case DisposalCategory.cartons:
         return 'Cartons';
-      case DisposalCategory.paper:
-        return 'Paper';
       case DisposalCategory.unusedClothes:
         return 'Unused Clothes';
     }
@@ -35,16 +26,10 @@ extension DisposalCategoryExtension on DisposalCategory {
     switch (this) {
       case DisposalCategory.plasticBottles:
         return '🍾';
-      case DisposalCategory.tires:
-        return '🛞';
-      case DisposalCategory.rubberBands:
-        return '⭕';
       case DisposalCategory.cans:
         return '🥫';
       case DisposalCategory.cartons:
         return '📦';
-      case DisposalCategory.paper:
-        return '📄';
       case DisposalCategory.unusedClothes:
         return '👕';
     }

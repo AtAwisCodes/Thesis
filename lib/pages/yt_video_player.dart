@@ -1,11 +1,11 @@
+import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:rexplore/components/expandable_details.dart';
-import 'package:rexplore/image_recognition/cameraFunc.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:rexplore/services/favorites_manager.dart';
 import 'package:rexplore/services/video_history_service.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class YtVideoPlayer extends StatefulWidget {
   final String videoId;
@@ -29,25 +29,81 @@ class YtVideoPlayer extends StatefulWidget {
 
 class _YtVideoPlayerState extends State<YtVideoPlayer> {
   late YoutubePlayerController _controller;
-  final List<String> comments = [];
   final VideoHistoryService _historyService = VideoHistoryService();
 
-  bool isFollowed = false;
   bool isLiked = false;
   bool isDisliked = false;
-  String _selectedTab = 'Steps'; // Track selected tab: 'Steps' or 'Information'
+  String _selectedTab = 'Steps';
 
   @override
   void initState() {
     super.initState();
 
-    _controller = YoutubePlayerController(
-      initialVideoId: widget.videoId,
-      flags: const YoutubePlayerFlags(
-        autoPlay: true,
-        mute: false,
-      ),
-    );
+    // Wrap controller initialization in error zone to catch type errors
+    runZonedGuarded(() {
+      _controller = YoutubePlayerController(
+        initialVideoId: widget.videoId,
+        flags: const YoutubePlayerFlags(
+          autoPlay: true,
+          mute: false,
+          enableCaption: false,
+          hideControls: false,
+          controlsVisibleAtStart: true,
+          forceHD: false,
+          disableDragSeek: false,
+        ),
+      )..addListener(() {
+          // Handle player errors
+          try {
+            if (_controller.value.hasError) {
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'Video playback error: ${_controller.value.errorCode}. This video may be restricted or unavailable.',
+                    ),
+                    duration: const Duration(seconds: 5),
+                    backgroundColor: Colors.red,
+                    action: SnackBarAction(
+                      label: 'Dismiss',
+                      textColor: Colors.white,
+                      onPressed: () {},
+                    ),
+                  ),
+                );
+              }
+            }
+          } catch (e) {
+            // Catch the type error from error code handling
+            print('Error in player listener: $e');
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'This video cannot be played. It may be restricted or region-locked.',
+                  ),
+                  duration: Duration(seconds: 5),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
+          }
+        });
+    }, (error, stack) {
+      // Catch any errors from the YouTube player initialization
+      print('YouTube player error: $error');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Failed to load video. Please try again or choose another video.',
+            ),
+            duration: Duration(seconds: 5),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    });
 
     // load initial liked state
     isLiked = FavoritesManager.instance.contains(widget.videoId);
@@ -68,6 +124,13 @@ class _YtVideoPlayerState extends State<YtVideoPlayer> {
   }
 
   @override
+  void deactivate() {
+    // Pause YouTube video when navigating away
+    _controller.pause();
+    super.deactivate();
+  }
+
+  @override
   void dispose() {
     // Clear any active snackbars when leaving this page
     ScaffoldMessenger.of(context).clearSnackBars();
@@ -76,172 +139,72 @@ class _YtVideoPlayerState extends State<YtVideoPlayer> {
     super.dispose();
   }
 
-  void _openComments(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+  Future<void> _openCamera() async {
+    // Show message that YouTube videos don't have AR models
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text(
+          'AR features are only available for user-uploaded videos. YouTube videos do not have 3D models.',
+        ),
+        duration: const Duration(seconds: 4),
+        backgroundColor: Colors.orange,
       ),
-      builder: (context) {
-        final TextEditingController _dialogCommentController =
-            TextEditingController();
-
-        return Padding(
-          padding: MediaQuery.of(context).viewInsets,
-          child: DraggableScrollableSheet(
-            expand: false,
-            initialChildSize: 0.7,
-            minChildSize: 0.4,
-            maxChildSize: 0.95,
-            builder: (context, scrollController) {
-              return StatefulBuilder(
-                builder: (context, setModalState) {
-                  final textColor =
-                      Theme.of(context).textTheme.bodyMedium?.color;
-
-                  return Column(
-                    children: [
-                      // drag handle
-                      Container(
-                        height: 5,
-                        width: 40,
-                        margin: const EdgeInsets.symmetric(vertical: 10),
-                        decoration: BoxDecoration(
-                          color: textColor?.withOpacity(0.4),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-
-                      // title
-                      Row(
-                        children: [
-                          Icon(Icons.comment_rounded,
-                              color: Theme.of(context).primaryColor),
-                          const SizedBox(width: 8),
-                          Text(
-                            "Comments",
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 18,
-                              color: textColor,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-
-                      // comments list
-                      Expanded(
-                        child: ListView.builder(
-                          controller: scrollController,
-                          itemCount: comments.length,
-                          itemBuilder: (context, index) {
-                            return ListTile(
-                              leading: CircleAvatar(
-                                backgroundColor: Theme.of(context)
-                                    .iconTheme
-                                    .color
-                                    ?.withOpacity(0.2),
-                                child: Icon(
-                                  Icons.person,
-                                  color: Theme.of(context).iconTheme.color,
-                                ),
-                              ),
-                              title: Text(
-                                "user${index + 1}",
-                                style: TextStyle(color: textColor),
-                              ),
-                              subtitle: Text(
-                                comments[index],
-                                style: TextStyle(color: textColor),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-
-                      // input
-                      SafeArea(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).scaffoldBackgroundColor,
-                            border: Border(
-                              top: BorderSide(
-                                color: textColor!.withOpacity(0.3),
-                              ),
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: TextField(
-                                  controller: _dialogCommentController,
-                                  style: TextStyle(color: textColor),
-                                  decoration: InputDecoration(
-                                    hintText: "Write a comment...",
-                                    hintStyle: TextStyle(
-                                        color: textColor.withOpacity(0.6)),
-                                    contentPadding: const EdgeInsets.symmetric(
-                                        horizontal: 12),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(20),
-                                      borderSide: BorderSide(
-                                        color: textColor.withOpacity(0.4),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              IconButton(
-                                icon: const Icon(Icons.send,
-                                    color: Colors.black54),
-                                onPressed: () {
-                                  if (_dialogCommentController
-                                      .text.isNotEmpty) {
-                                    setState(() {
-                                      comments.insert(
-                                          0, _dialogCommentController.text);
-                                    });
-                                    setModalState(() {});
-                                    _dialogCommentController.clear();
-                                  }
-                                },
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  );
-                },
-              );
-            },
-          ),
-        );
-      },
     );
   }
 
-  Future<void> _openCamera() async {
-    final cameras = await availableCameras();
-    if (cameras.isNotEmpty) {
+  /// Open YouTube video page in browser
+  Future<void> _openYouTubeVideo() async {
+    final url = Uri.parse('https://www.youtube.com/watch?v=${widget.videoId}');
+    try {
+      if (await canLaunchUrl(url)) {
+        await launchUrl(url, mode: LaunchMode.externalApplication);
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Could not open YouTube'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
       if (mounted) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => cameraFunc(camera: cameras[0]),
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error opening YouTube: $e'),
+            backgroundColor: Colors.red,
           ),
         );
       }
-    } else {
+    }
+  }
+
+  /// Open YouTube channel page in browser
+  Future<void> _openYouTubeChannel() async {
+    // Search for the channel on YouTube
+    final searchUrl = Uri.parse(
+        'https://www.youtube.com/results?search_query=${Uri.encodeComponent(widget.channelName)}');
+    try {
+      if (await canLaunchUrl(searchUrl)) {
+        await launchUrl(searchUrl, mode: LaunchMode.externalApplication);
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Could not open YouTube'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No cameras found')),
+          SnackBar(
+            content: Text('Error opening YouTube: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
@@ -351,18 +314,32 @@ class _YtVideoPlayerState extends State<YtVideoPlayer> {
             ),
           ),
 
-          // Content area - Scrollable
-          Container(
-            constraints: const BoxConstraints(
-              maxHeight: 300, // Maximum height for scrollable content
-              minHeight: 150, // Minimum height
-            ),
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: _selectedTab == 'Steps'
-                  ? _buildStepsContent()
-                  : _buildInformationContent(),
-            ),
+          // Content area - Scrollable and responsive
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final screenHeight = MediaQuery.of(context).size.height;
+              // Make max height responsive: 40% of screen height but not less than 300 or more than 600
+              final responsiveMaxHeight =
+                  (screenHeight * 0.4).clamp(300.0, 600.0);
+
+              return Container(
+                constraints: BoxConstraints(
+                  maxHeight: responsiveMaxHeight,
+                  minHeight: 150,
+                ),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.only(
+                    left: 16,
+                    right: 16,
+                    top: 16,
+                    bottom: 24, // Extra bottom padding to prevent cutoff
+                  ),
+                  child: _selectedTab == 'Steps'
+                      ? _buildStepsContent()
+                      : _buildInformationContent(),
+                ),
+              );
+            },
           ),
         ],
       ),
@@ -474,16 +451,8 @@ class _YtVideoPlayerState extends State<YtVideoPlayer> {
         const Divider(height: 24),
         _buildInfoRow(Icons.visibility, 'Views', widget.viewsCount),
         const Divider(height: 24),
-        _buildInfoRow(Icons.comment, 'Comments', '${comments.length}'),
-        const Divider(height: 24),
         _buildInfoRow(
             Icons.thumb_up, 'Status', isLiked ? 'Liked' : 'Not Liked'),
-        const Divider(height: 24),
-        _buildInfoRow(
-          Icons.follow_the_signs,
-          'Following',
-          isFollowed ? 'Yes' : 'No',
-        ),
         const Divider(height: 24),
         const Text(
           'About:',
@@ -550,10 +519,26 @@ class _YtVideoPlayerState extends State<YtVideoPlayer> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-          elevation: 0, backgroundColor: Colors.transparent, actions: []),
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+      ),
       body: SingleChildScrollView(
         child: YoutubePlayerBuilder(
-          player: YoutubePlayer(controller: _controller),
+          player: YoutubePlayer(
+            controller: _controller,
+            showVideoProgressIndicator: true,
+            progressIndicatorColor: Colors.red,
+            progressColors: const ProgressBarColors(
+              playedColor: Colors.red,
+              handleColor: Colors.redAccent,
+            ),
+            onReady: () {
+              print('YouTube player is ready');
+            },
+            onEnded: (metadata) {
+              print('Video ended');
+            },
+          ),
           builder: (context, player) {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -591,9 +576,14 @@ class _YtVideoPlayerState extends State<YtVideoPlayer> {
                         children: [
                           CircleAvatar(
                             radius: 18,
-                            backgroundImage: CachedNetworkImageProvider(
-                              widget.thumbnailUrl,
-                            ),
+                            backgroundImage: widget.thumbnailUrl.isNotEmpty
+                                ? CachedNetworkImageProvider(
+                                    widget.thumbnailUrl,
+                                  )
+                                : null,
+                            child: widget.thumbnailUrl.isEmpty
+                                ? const Icon(Icons.person, size: 18)
+                                : null,
                           ),
                           const SizedBox(width: 6),
                           Text(
@@ -623,6 +613,7 @@ class _YtVideoPlayerState extends State<YtVideoPlayer> {
                                     'channel': widget.channelName,
                                     'thumbnail': widget.thumbnailUrl,
                                     'views': widget.viewsCount,
+                                    'videoType': 'youtube',
                                   });
                                 } else {
                                   FavoritesManager.instance
@@ -649,26 +640,20 @@ class _YtVideoPlayerState extends State<YtVideoPlayer> {
                             width: 90,
                             height: 36,
                             child: ElevatedButton(
-                              onPressed: () {
-                                setState(() {
-                                  isFollowed = !isFollowed;
-                                });
+                              onPressed: () async {
+                                await _openYouTubeChannel();
                               },
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: isFollowed
-                                    ? Colors.grey
-                                    : const Color(0xff5BEC84),
+                                backgroundColor: const Color(0xff5BEC84),
                                 padding: EdgeInsets.zero,
                               ),
-                              child: FittedBox(
+                              child: const FittedBox(
                                 fit: BoxFit.scaleDown,
                                 child: Text(
-                                  isFollowed ? "Followed" : "Follow",
+                                  "Follow",
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
-                                    color: isFollowed
-                                        ? Colors.white70
-                                        : Colors.black,
+                                    color: Colors.black,
                                   ),
                                 ),
                               ),
@@ -680,9 +665,44 @@ class _YtVideoPlayerState extends State<YtVideoPlayer> {
                   ),
                 ),
 
-                // comments trigger
+                // comments trigger - opens YouTube video
                 GestureDetector(
-                  onTap: () => _openComments(context),
+                  onTap: () async {
+                    // Show dialog explaining the redirect
+                    final shouldOpen = await showDialog<bool>(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Row(
+                          children: [
+                            Icon(Icons.comment, color: Colors.red),
+                            SizedBox(width: 8),
+                            Text('Comment on YouTube'),
+                          ],
+                        ),
+                        content: const Text(
+                          'You\'ll be redirected to YouTube to view and post comments for this video.',
+                          style: TextStyle(fontSize: 16),
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, false),
+                            child: const Text('Cancel'),
+                          ),
+                          ElevatedButton(
+                            onPressed: () => Navigator.pop(context, true),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.red,
+                            ),
+                            child: const Text('Open YouTube'),
+                          ),
+                        ],
+                      ),
+                    );
+
+                    if (shouldOpen == true) {
+                      await _openYouTubeVideo();
+                    }
+                  },
                   child: Container(
                     height: 50,
                     width: double.infinity,
@@ -692,9 +712,18 @@ class _YtVideoPlayerState extends State<YtVideoPlayer> {
                       border: Border.all(color: Colors.grey),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: Text(
-                      "Comments...",
-                      style: TextStyle(color: Theme.of(context).hintColor),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            "Comment on YouTube...",
+                            style:
+                                TextStyle(color: Theme.of(context).hintColor),
+                          ),
+                        ),
+                        const Icon(Icons.open_in_new,
+                            size: 18, color: Colors.grey),
+                      ],
                     ),
                   ),
                 ),
@@ -711,11 +740,18 @@ class _YtVideoPlayerState extends State<YtVideoPlayer> {
         ),
       ),
 
-      // AR Camera button
-      floatingActionButton: FloatingActionButton(
+      // AR Button - YouTube videos don't have AR models
+      floatingActionButton: FloatingActionButton.extended(
         onPressed: _openCamera,
-        backgroundColor: Colors.white,
-        child: const Icon(Icons.camera_enhance_rounded),
+        backgroundColor: Colors.orange,
+        icon: const Icon(Icons.block, color: Colors.white),
+        label: const Text(
+          "No Model",
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
       ),
     );
   }

@@ -1,15 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:rexplore/constants/input_limits.dart';
 
 class MyTextfield extends StatefulWidget {
   final TextEditingController controller;
   final String hintText;
   final bool obscureText;
+  final int? maxLength;
+  final bool enforceLimit;
 
   const MyTextfield({
     super.key,
     required this.controller,
     required this.hintText,
     required this.obscureText,
+    this.maxLength,
+    this.enforceLimit = true, // Default to enforcing limits
   });
 
   @override
@@ -38,6 +44,30 @@ class _MyTextfieldState extends State<MyTextfield> {
       case 'last name':
       case 'middle initial':
         return const Icon(Icons.person, color: Colors.grey);
+      default:
+        return null;
+    }
+  }
+
+  // Get max length based on hint text
+  int? _getMaxLength() {
+    // If enforceLimit is false, don't apply any limits
+    if (!widget.enforceLimit) return null;
+
+    if (widget.maxLength != null) return widget.maxLength;
+
+    switch (widget.hintText.toLowerCase()) {
+      case 'email':
+        return InputLimits.email;
+      case 'password':
+      case 'confirm password':
+        return InputLimits.password;
+      case 'first name':
+        return InputLimits.firstName;
+      case 'last name':
+        return InputLimits.lastName;
+      case 'middle initial':
+        return InputLimits.middleInitial;
       default:
         return null;
     }
@@ -82,6 +112,8 @@ class _MyTextfieldState extends State<MyTextfield> {
 
   @override
   Widget build(BuildContext context) {
+    final maxLen = _getMaxLength();
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 25.0, vertical: 8.0),
       child: TextFormField(
@@ -90,6 +122,9 @@ class _MyTextfieldState extends State<MyTextfield> {
         style: const TextStyle(color: Colors.white),
         cursorColor: Colors.blueAccent,
         validator: _validatePassword, // Apply validation (Goal 2)
+        maxLength: maxLen,
+        inputFormatters:
+            maxLen != null ? [LengthLimitingTextInputFormatter(maxLen)] : null,
         decoration: InputDecoration(
           labelText: widget.hintText,
           labelStyle: TextStyle(
@@ -99,6 +134,9 @@ class _MyTextfieldState extends State<MyTextfield> {
           ),
           floatingLabelBehavior: FloatingLabelBehavior.auto,
           prefixIcon: _getPrefixIcon(widget.hintText),
+
+          // Hide the default counter for a cleaner look
+          counterText: '',
 
           // Goal 1: Eye toggle only for password fields
           suffixIcon: (widget.hintText.toLowerCase() == "password" ||

@@ -9,6 +9,7 @@ import 'package:rexplore/services/video_history_service.dart';
 import 'package:rexplore/services/user_profile_sync_service.dart';
 import 'package:rexplore/pages/uploaded_video_player.dart';
 import 'package:rexplore/pages/yt_video_player.dart';
+import 'package:rexplore/components/recycle_gif_loader.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:video_player/video_player.dart';
 import 'package:intl/intl.dart';
@@ -180,11 +181,26 @@ class _ProfilePageState extends State<ProfilePage> {
               const SizedBox(height: 16),
               TextField(
                 controller: nameController,
-                decoration: const InputDecoration(labelText: 'Name'),
+                maxLength: 100,
+                decoration: InputDecoration(
+                  labelText: 'Name',
+                  counterStyle: TextStyle(
+                    color: Colors.grey[600],
+                    fontSize: 11,
+                  ),
+                ),
               ),
               TextField(
                 controller: bioController,
-                decoration: const InputDecoration(labelText: 'Bio'),
+                maxLength: 500,
+                maxLines: 3,
+                decoration: InputDecoration(
+                  labelText: 'Bio',
+                  counterStyle: TextStyle(
+                    color: Colors.grey[600],
+                    fontSize: 11,
+                  ),
+                ),
               ),
               const SizedBox(height: 20),
               ElevatedButton(
@@ -216,8 +232,11 @@ class _ProfilePageState extends State<ProfilePage> {
                   showDialog(
                     context: context,
                     barrierDismissible: false,
-                    builder: (context) => const Center(
-                      child: CircularProgressIndicator(),
+                    builder: (context) => Center(
+                      child: RecycleGifLoader(
+                        size: 80,
+                        text: 'Saving profile...',
+                      ),
                     ),
                   );
 
@@ -332,7 +351,12 @@ class _ProfilePageState extends State<ProfilePage> {
                   stream: _followService.getFollowers(uid),
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator());
+                      return Center(
+                        child: RecycleGifLoader(
+                          size: 60,
+                          text: 'Loading followers...',
+                        ),
+                      );
                     }
 
                     if (!snapshot.hasData || snapshot.data!.isEmpty) {
@@ -419,7 +443,12 @@ class _ProfilePageState extends State<ProfilePage> {
                   stream: _followService.getFollowing(uid),
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator());
+                      return Center(
+                        child: RecycleGifLoader(
+                          size: 60,
+                          text: 'Loading following...',
+                        ),
+                      );
                     }
 
                     if (!snapshot.hasData || snapshot.data!.isEmpty) {
@@ -473,9 +502,14 @@ class _ProfilePageState extends State<ProfilePage> {
         }
 
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const SizedBox(
+          return SizedBox(
             height: 220,
-            child: Center(child: CircularProgressIndicator()),
+            child: Center(
+              child: RecycleGifLoader(
+                size: 70,
+                text: 'Loading your videos...',
+              ),
+            ),
           );
         }
 
@@ -525,7 +559,12 @@ class _ProfilePageState extends State<ProfilePage> {
       backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
         child: isLoading
-            ? const Center(child: CircularProgressIndicator())
+            ? Center(
+                child: RecycleGifLoader(
+                  size: 80,
+                  text: 'Loading profile...',
+                ),
+              )
             : SingleChildScrollView(
                 padding: const EdgeInsets.all(16),
                 child: Column(
@@ -1263,6 +1302,15 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
       _controller.dispose();
       _initializeController();
     }
+  }
+
+  @override
+  void deactivate() {
+    // Pause video when navigating away or widget is deactivated
+    if (_controller.value.isInitialized) {
+      _controller.pause();
+    }
+    super.deactivate();
   }
 
   @override

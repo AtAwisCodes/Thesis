@@ -6,12 +6,14 @@ import 'package:provider/provider.dart';
 import 'package:rexplore/firebase_service.dart';
 import 'package:rexplore/pages/auth_page.dart';
 import 'package:rexplore/services/ThemeProvider.dart';
+import 'package:rexplore/services/cache_service.dart';
 import 'package:rexplore/theme.dart/darkTheme.dart';
 import 'package:rexplore/theme.dart/lightTheme.dart';
 import 'package:rexplore/utilities/disposable_email_checker.dart';
 import 'package:rexplore/viewmodel/yt_videoview_model.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'firebase_options.dart';
+import 'dart:async';
 
 List<CameraDescription> cameras = [];
 
@@ -35,14 +37,32 @@ void main() async {
   await DisposableEmailChecker.loadDisposableDomains();
 
   GetIt.instance.registerSingleton<FirebaseService>(FirebaseService());
-  runApp(
-    MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => ThemeProvider()),
-        ChangeNotifierProvider(create: (_) => YtVideoviewModel()),
-      ],
-      child: const MyApp(),
-    ),
+
+  // Clear app cache on startup (runs in background)
+  CacheService().clearAllCache().then((result) {
+    if (result['success']) {
+      print('🧹 Cache cleared on startup: ${result['deletedSizeMB']} MB freed');
+    }
+  });
+
+  // Wrap app in error zone to catch all uncaught errors (including WebView crashes)
+  runZonedGuarded(
+    () {
+      runApp(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider(create: (_) => ThemeProvider()),
+            ChangeNotifierProvider(create: (_) => YtVideoviewModel()),
+          ],
+          child: const MyApp(),
+        ),
+      );
+    },
+    (error, stack) {
+      // Log WebView and other crashes
+      print('💥 App Error Caught: $error');
+      print('Stack trace: $stack');
+    },
   );
 }
 
