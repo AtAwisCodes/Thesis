@@ -33,6 +33,8 @@ class _YtVideoPlayerState extends State<YtVideoPlayer> {
 
   bool isLiked = false;
   bool isDisliked = false;
+  bool _isFavorited = false;
+  int _likeCount = 0;
   String _selectedTab = 'Steps';
 
   @override
@@ -106,7 +108,11 @@ class _YtVideoPlayerState extends State<YtVideoPlayer> {
     });
 
     // load initial liked state
-    isLiked = FavoritesManager.instance.contains(widget.videoId);
+    _isFavorited = FavoritesManager.instance.contains(widget.videoId);
+    isLiked = _isFavorited;
+
+    // Initialize like count based on favorited state
+    _likeCount = _isFavorited ? 1 : 0;
 
     // Add to video history
     _addToHistory();
@@ -597,32 +603,80 @@ class _YtVideoPlayerState extends State<YtVideoPlayer> {
                       ),
                       Row(
                         children: [
-                          IconButton(
-                            icon: Icon(
-                              Icons.thumb_up,
-                              color: isLiked ? Colors.green : Colors.grey,
-                            ),
-                            onPressed: () {
-                              setState(() {
-                                isLiked = !isLiked;
-                                if (isLiked) {
-                                  isDisliked = false;
-                                  FavoritesManager.instance.addFavorite({
-                                    'id': widget.videoId,
-                                    'title': widget.videoTitle,
-                                    'channel': widget.channelName,
-                                    'thumbnail': widget.thumbnailUrl,
-                                    'views': widget.viewsCount,
-                                    'videoType': 'youtube',
+                          // Like button with count
+                          Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: Icon(
+                                  Icons.thumb_up,
+                                  color: isLiked ? Colors.green : Colors.grey,
+                                ),
+                                onPressed: () {
+                                  setState(() {
+                                    isLiked = !isLiked;
+                                    if (isLiked) {
+                                      isDisliked = false;
+                                      _likeCount++;
+                                      _isFavorited = true;
+                                      FavoritesManager.instance.addFavorite({
+                                        'id': widget.videoId,
+                                        'title': widget.videoTitle,
+                                        'channel': widget.channelName,
+                                        'thumbnail': widget.thumbnailUrl,
+                                        'views': widget.viewsCount,
+                                        'videoType': 'youtube',
+                                      });
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        const SnackBar(
+                                          content: Row(
+                                            children: [
+                                              Icon(Icons.bookmark,
+                                                  color: Colors.white),
+                                              SizedBox(width: 8),
+                                              Text('Added to favorites'),
+                                            ],
+                                          ),
+                                          backgroundColor: Colors.green,
+                                          duration: Duration(seconds: 2),
+                                        ),
+                                      );
+                                    } else {
+                                      _likeCount =
+                                          _likeCount > 0 ? _likeCount - 1 : 0;
+                                      _isFavorited = false;
+                                      FavoritesManager.instance
+                                          .removeFavorite(widget.videoId);
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        const SnackBar(
+                                          content: Row(
+                                            children: [
+                                              Icon(Icons.bookmark_border,
+                                                  color: Colors.white),
+                                              SizedBox(width: 8),
+                                              Text('Removed from favorites'),
+                                            ],
+                                          ),
+                                          backgroundColor: Colors.grey,
+                                          duration: Duration(seconds: 2),
+                                        ),
+                                      );
+                                    }
                                   });
-                                } else {
-                                  FavoritesManager.instance
-                                      .removeFavorite(widget.videoId);
-                                }
-                              });
-                            },
+                                },
+                              ),
+                              Text(
+                                '$_likeCount',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: 2), // closer spacing
+                          // Dislike button
                           IconButton(
                             icon: Icon(
                               Icons.thumb_down,
@@ -631,7 +685,16 @@ class _YtVideoPlayerState extends State<YtVideoPlayer> {
                             onPressed: () {
                               setState(() {
                                 isDisliked = !isDisliked;
-                                if (isDisliked) isLiked = false;
+                                if (isDisliked) {
+                                  isLiked = false;
+                                  if (_isFavorited) {
+                                    _likeCount =
+                                        _likeCount > 0 ? _likeCount - 1 : 0;
+                                    _isFavorited = false;
+                                    FavoritesManager.instance
+                                        .removeFavorite(widget.videoId);
+                                  }
+                                }
                               });
                             },
                           ),

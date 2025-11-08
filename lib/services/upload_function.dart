@@ -201,7 +201,7 @@ class VideoUploadService {
 
           if (statusLower == 'succeeded') {
             // Model is ready, fetch it immediately
-            onStatusUpdate('✅ Model completed! Fetching GLB file...');
+            onStatusUpdate('Model completed! Fetching GLB file...');
 
             final fetchResult = await _fetchCompletedModel(
               taskId: taskId,
@@ -210,14 +210,14 @@ class VideoUploadService {
             );
 
             if (fetchResult != null && fetchResult['success'] == true) {
-              print('✅ GLB file downloaded and saved!');
+              print('GLB file downloaded and saved!');
               print('   Model URL: ${fetchResult['model_public_url']}');
               print('   Firestore ID: ${fetchResult['firestore_doc_id']}');
-              onStatusUpdate('✅ 3D model ready for AR!');
+              onStatusUpdate('3D model ready for AR!');
               return fetchResult;
             } else {
-              print('❌ Fetch returned null or failed');
-              onStatusUpdate('⚠️ Model completed but download failed');
+              print('Fetch returned null or failed');
+              onStatusUpdate('Model completed but download failed');
               return null;
             }
           } else if (statusLower == 'failed' || statusLower == 'canceled') {
@@ -517,40 +517,60 @@ class VideoUploadService {
 
       onProgress(0.9, 'Video upload completed!');
 
-      // Step 12: Generate 3D model if model images were uploaded
+      // Step 12: Generate 3D model automatically if model images were uploaded
       if (modelImageUrls.isNotEmpty && modelImageUrls.length >= 3) {
-        onProgress(0.95, 'Initiating 3D model generation...');
+        onProgress(0.92, 'Initiating 3D model generation...');
 
         // Check backend health before attempting generation
         final backendHealthy = await isBackendHealthy();
 
         if (!backendHealthy) {
-          print('⚠️ Backend not available - skipping 3D generation for now');
+          print('Backend not available - skipping 3D generation for now');
           await _firestore.collection('videos').doc(docRef.id).update({
             'modelGenerationPending': true,
             'modelGenerationError': 'Backend unavailable at upload time',
           });
+          onProgress(0.95, 'Video uploaded (3D model pending)');
         } else {
+          onProgress(0.94, 'Submitting to 3D model service...');
+
           // Small delay to ensure Firestore write is propagated
           await Future.delayed(const Duration(milliseconds: 500));
 
-          // Generate 3D model asynchronously (don't wait for completion)
-          _generate3DModelAsync(
-            videoId: docRef.id,
-            onStatusUpdate: (status) {
-              print('3D Model Status: $status');
-            },
-          );
+          // Generate 3D model - wait for job submission (not completion)
+          try {
+            final jobSubmitted = await _submitModelGenerationJob(
+              videoId: docRef.id,
+              onStatusUpdate: (status) {
+                onProgress(0.96, status);
+              },
+            );
 
-          print(
-              '3D model generation queued for video: ${docRef.id} with ${modelImageUrls.length} images');
+            if (jobSubmitted) {
+              onProgress(0.98, '3D model generation queued successfully!');
+              print(
+                  '3D model generation queued for video: ${docRef.id} with ${modelImageUrls.length} images');
+            } else {
+              print('Failed to queue 3D model generation');
+              await _firestore.collection('videos').doc(docRef.id).update({
+                'modelGenerationPending': true,
+                'modelGenerationError': 'Failed to submit generation job',
+              });
+            }
+          } catch (e) {
+            print('Error submitting 3D model job: $e');
+            await _firestore.collection('videos').doc(docRef.id).update({
+              'modelGenerationPending': true,
+              'modelGenerationError': e.toString(),
+            });
+          }
         }
       } else {
         print(
             'Skipping 3D generation: Only ${modelImageUrls.length} images (need 3+)');
       }
 
-      onProgress(1.0, 'All done!');
+      onProgress(1.0, 'Upload complete! 3D model processing in background...');
 
       // Send notification to followers about new video (asynchronously)
       _sendNewVideoNotificationAsync(
@@ -570,60 +590,48 @@ class VideoUploadService {
     }
   }
 
-  //Generate 3D model asynchronously (non-blocking)
-  Future<void> _generate3DModelAsync({
+  // Submit 3D model generation job (waits for job submission, not completion)
+  Future<bool> _submitModelGenerationJob({
     required String videoId,
     required Function(String status) onStatusUpdate,
   }) async {
     try {
-      print('Starting async 3D generation for video: $videoId');
+      onStatusUpdate('Submitting 3D generation request...');
+      print('Submitting 3D generation job for video: $videoId');
 
-      final modelData = await generate3DModelFromImages(
-        videoId: videoId,
-        onStatusUpdate: onStatusUpdate,
-      );
+      final user = _auth.currentUser;
+      if (user == null) {
+        throw Exception('User not authenticated');
+      }
 
-      if (modelData != null) {
-        print('3D model generated successfully!');
-        print('Model URL: ${modelData['model_public_url']}');
-        print('Firestore Doc: ${modelData['firestore_doc_id']}');
+      final response = await http
+          .post(
+            Uri.parse('$_backendUrl/api/generate-3d'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'video_id': videoId,
+              'user_id': user.uid,
+            }),
+          )
+          .timeout(const Duration(seconds: 30));
 
-        // Update Firestore with generated model info
-        await _firestore.collection('videos').doc(videoId).update({
-          'has3DModel': true,
-          'generatedModelUrl': modelData['model_public_url'],
-          'generatedModelId': modelData['firestore_doc_id'],
-          'modelGeneratedAt': FieldValue.serverTimestamp(),
-        });
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final taskId = data['task_id'];
 
-        onStatusUpdate('3D model generated and saved!');
-        print('Firestore updated with 3D model info');
+        onStatusUpdate('3D model job submitted (ID: $taskId)');
+        print('Job submitted successfully: $taskId');
+        print('   Auto-fetch worker will complete the model in 5-10 minutes');
+
+        return true;
       } else {
-        print('3D generation returned null - check backend logs');
-        onStatusUpdate('3D model generation failed - check backend');
-
-        // Update status in Firestore
-        await _firestore.collection('videos').doc(videoId).update({
-          'has3DModel': false,
-          'modelGenerationError': 'Generation returned null',
-          'modelGenerationAttemptedAt': FieldValue.serverTimestamp(),
-        });
+        print('Failed to submit job: ${response.statusCode}');
+        print('   Response: ${response.body}');
+        return false;
       }
     } catch (e) {
-      final errorMsg = 'Error in async 3D model generation: $e';
-      print('$errorMsg');
-      onStatusUpdate('Failed to generate 3D model: $e');
-
-      // Log error to Firestore for debugging
-      try {
-        await _firestore.collection('videos').doc(videoId).update({
-          'has3DModel': false,
-          'modelGenerationError': e.toString(),
-          'modelGenerationAttemptedAt': FieldValue.serverTimestamp(),
-        });
-      } catch (firestoreError) {
-        print('Could not update Firestore with error: $firestoreError');
-      }
+      print('Error submitting 3D model job: $e');
+      return false;
     }
   }
 

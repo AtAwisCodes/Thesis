@@ -89,7 +89,7 @@ class _ModelStatusWidgetState extends State<ModelStatusWidget> {
           });
         }
 
-        print('📊 Model status for ${widget.videoId}: $status ($progress%)');
+        print('Model status for ${widget.videoId}: $status ($progress%)');
 
         // Status is checked by backend auto-fetch, but we track progress here
         if (status == 'succeeded' || status == 'failed') {

@@ -82,8 +82,9 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
         );
       }
 
-      if (mounted && newStatus == 'resolved') {
-        Navigator.pop(context);
+      // Refresh the page to show updated status
+      if (mounted) {
+        setState(() {});
       }
     } catch (e) {
       if (mounted) {
@@ -138,9 +139,6 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
         });
       }
 
-      // Mark report as resolved
-      await _updateStatus('resolved', showSnackbar: false);
-
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -150,7 +148,8 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
             duration: Duration(seconds: 3),
           ),
         );
-        Navigator.pop(context);
+        // Refresh the page to show updated state
+        setState(() {});
       }
     } catch (e) {
       if (mounted) {
@@ -211,7 +210,8 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
             backgroundColor: Colors.green,
           ),
         );
-        Navigator.pop(context);
+        // Refresh the page to show updated state
+        setState(() {});
       }
     } catch (e) {
       if (mounted) {
@@ -300,9 +300,6 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
           'createdAt': FieldValue.serverTimestamp(),
         });
 
-        // Update report status
-        await _updateStatus('resolved', showSnackbar: false);
-
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -310,7 +307,6 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
               backgroundColor: Colors.green,
             ),
           );
-          Navigator.pop(context);
         }
       }
     } catch (e) {
@@ -618,13 +614,14 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                                   as Map<String, dynamic>?)?['isDeleted'] ==
                               true;
 
-                      // If video is deleted, show restore button
-                      if (isDeleted) {
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
+                      // Show video status if deleted
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (isDeleted)
                             Container(
                               padding: const EdgeInsets.all(12),
+                              margin: const EdgeInsets.only(bottom: 16),
                               decoration: BoxDecoration(
                                 color: Colors.red.shade50,
                                 borderRadius: BorderRadius.circular(8),
@@ -645,90 +642,109 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                                 ],
                               ),
                             ),
-                            const SizedBox(height: 16),
-                            ElevatedButton.icon(
-                              onPressed: _isProcessing ? null : _restoreVideo,
-                              icon: const Icon(Icons.restore),
-                              label: const Text('Restore Video'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.green,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 20,
-                                  vertical: 12,
+
+                          // Action buttons - always show regardless of status
+                          Wrap(
+                            spacing: 12,
+                            runSpacing: 12,
+                            children: [
+                              // Status change buttons
+                              if (status != 'reviewing')
+                                ElevatedButton.icon(
+                                  onPressed: _isProcessing
+                                      ? null
+                                      : () => _updateStatus('reviewing'),
+                                  icon: const Icon(Icons.visibility),
+                                  label: const Text('Mark as Reviewing'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.blue,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 20,
+                                      vertical: 12,
+                                    ),
+                                  ),
+                                ),
+
+                              // Action buttons
+                              ElevatedButton.icon(
+                                onPressed: _isProcessing ? null : _sendWarning,
+                                icon: const Icon(Icons.warning),
+                                label: const Text('Send Warning'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.orange,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 20,
+                                    vertical: 12,
+                                  ),
                                 ),
                               ),
-                            ),
-                          ],
-                        );
-                      }
 
-                      // Normal action buttons if not resolved/dismissed
-                      if (status == 'resolved' || status == 'dismissed') {
-                        return const Text(
-                          'This report has been closed.',
-                          style: TextStyle(color: Colors.grey),
-                        );
-                      }
-
-                      return Wrap(
-                        spacing: 12,
-                        runSpacing: 12,
-                        children: [
-                          if (status != 'reviewing')
-                            ElevatedButton.icon(
-                              onPressed: _isProcessing
-                                  ? null
-                                  : () => _updateStatus('reviewing'),
-                              icon: const Icon(Icons.visibility),
-                              label: const Text('Mark as Reviewing'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.blue,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 20,
-                                  vertical: 12,
+                              if (isDeleted)
+                                ElevatedButton.icon(
+                                  onPressed:
+                                      _isProcessing ? null : _restoreVideo,
+                                  icon: const Icon(Icons.restore),
+                                  label: const Text('Restore Video'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.green,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 20,
+                                      vertical: 12,
+                                    ),
+                                  ),
+                                )
+                              else
+                                ElevatedButton.icon(
+                                  onPressed:
+                                      _isProcessing ? null : _deleteVideo,
+                                  icon: const Icon(Icons.delete),
+                                  label: const Text('Delete Video'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.red,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 20,
+                                      vertical: 12,
+                                    ),
+                                  ),
                                 ),
-                              ),
-                            ),
-                          ElevatedButton.icon(
-                            onPressed: _isProcessing ? null : _sendWarning,
-                            icon: const Icon(Icons.warning),
-                            label: const Text('Send Warning'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.orange,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 20,
-                                vertical: 12,
-                              ),
-                            ),
-                          ),
-                          ElevatedButton.icon(
-                            onPressed: _isProcessing ? null : _deleteVideo,
-                            icon: const Icon(Icons.delete),
-                            label: const Text('Delete Video'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.red,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 20,
-                                vertical: 12,
-                              ),
-                            ),
-                          ),
-                          OutlinedButton.icon(
-                            onPressed: _isProcessing
-                                ? null
-                                : () => _updateStatus('dismissed'),
-                            icon: const Icon(Icons.cancel),
-                            label: const Text('Dismiss Report'),
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 20,
-                                vertical: 12,
-                              ),
-                            ),
+
+                              // Status buttons
+                              if (status != 'resolved')
+                                ElevatedButton.icon(
+                                  onPressed: _isProcessing
+                                      ? null
+                                      : () => _updateStatus('resolved'),
+                                  icon: const Icon(Icons.check_circle),
+                                  label: const Text('Mark as Resolved'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.green,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 20,
+                                      vertical: 12,
+                                    ),
+                                  ),
+                                ),
+
+                              if (status != 'dismissed')
+                                OutlinedButton.icon(
+                                  onPressed: _isProcessing
+                                      ? null
+                                      : () => _updateStatus('dismissed'),
+                                  icon: const Icon(Icons.cancel),
+                                  label: const Text('Dismiss Report'),
+                                  style: OutlinedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 20,
+                                      vertical: 12,
+                                    ),
+                                  ),
+                                ),
+                            ],
                           ),
                         ],
                       );

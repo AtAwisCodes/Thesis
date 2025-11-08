@@ -89,16 +89,36 @@ def generate_3d_model():
                 "error": "modelImages missing or less than 3 images required"
             }), 400
 
-        # Step 2: Send to Meshy AI (using v1 API supported parameters only)
+        # Step 2: Send to Meshy AI with OPTIMIZED AR parameters (Android ARCore Only)
         payload = {
             "image_urls": image_urls,
-            "should_remesh": True,          # Optimize mesh topology
-            "should_texture": True,         # Add realistic textures
-            "enable_pbr": True              # PBR materials for better lighting
+            
+            # Core AR Optimization Settings for Android
+            "ai_model": "meshy-5",              # Meshy-5 for stable multi-image generation
+            "topology": "triangle",             # Triangle mesh for ARCore compatibility
+            "target_polycount": 10000,          # 10k polygons - optimized for Android devices
+            "should_remesh": True,              # Enable remeshing for clean topology
+            
+            # Texture Settings for AR
+            "should_texture": True,             # Generate textures
+            "enable_pbr": True,                 # PBR maps (metallic, roughness, normal) for realistic AR lighting
+            
+            # Format Specification - Android Only
+            "target_formats": ["glb"],          # GLB only for Android ARCore
+            
+            # Geometry Optimization
+            "symmetry_mode": "auto"             # Auto-detect symmetry for better mesh quality
         }
 
-        print(f"Sending {len(image_urls)} images to Meshy AI...")
-        print(f"Configuration: remesh={payload['should_remesh']}, texture={payload['should_texture']}, pbr={payload['enable_pbr']}")
+        print(f"    Sending {len(image_urls)} images to Meshy AI...")
+        print(f"    Android ARCore Configuration:")
+        print(f"   - AI Model: {payload['ai_model']}")
+        print(f"   - Topology: {payload['topology']} (triangulated mesh)")
+        print(f"   - Target Polycount: {payload['target_polycount']:,}")
+        print(f"   - Remesh: {payload['should_remesh']}")
+        print(f"   - PBR Textures: {payload['enable_pbr']}")
+        print(f"   - Format: GLB (Android ARCore only)")
+        print(f"   - Symmetry: {payload['symmetry_mode']}")
         response = requests.post(
             "https://api.meshy.ai/openapi/v1/multi-image-to-3d",
             headers=get_meshy_headers(),
@@ -238,7 +258,7 @@ def fetch_generated_model():
         video_docs = list(video_query.stream())
         video_id = video_docs[0].id if video_docs else None
 
-        # Step 6: Save to Firestore
+        # Step 6: Save to Firestore with AR compatibility metadata
         model_doc = {
             "userId": user_id,
             "videoId": video_id,  
@@ -250,6 +270,16 @@ def fetch_generated_model():
             "videoUrl": model_info.get("video_url"),
             "createdAt": firestore.SERVER_TIMESTAMP,
             "updatedAt": firestore.SERVER_TIMESTAMP,
+            
+            # AR Compatibility Metadata (Android ARCore Optimized)
+            "arCompatible": True,
+            "platform": "android",              # Android only
+            "topology": "triangle",             # Triangle mesh for ARCore
+            "format": "glb",                    # GLB format for Android ARCore
+            "targetPolycount": 10000,           # Optimized 10k for Android devices
+            "optimizedForMobile": True,
+            "aiModel": "meshy-5",               # AI model version used
+            "hasPBR": True                      # PBR materials for realistic lighting
         }
 
         doc_ref = db.collection("generated_models_files").add(model_doc)
@@ -494,7 +524,7 @@ def fetch_and_save_model_internal(task_id, user_id, video_id):
         public_url = supabase.storage.from_("models").get_public_url(filename)
         print(f"[AUTO-FETCH] Model public URL: {public_url}")
 
-        # Step 5: Save to Firestore
+        # Step 5: Save to Firestore with AR compatibility metadata
         model_doc = {
             "userId": user_id,
             "videoId": video_id,
@@ -506,6 +536,16 @@ def fetch_and_save_model_internal(task_id, user_id, video_id):
             "videoUrl": model_info.get("video_url"),
             "createdAt": firestore.SERVER_TIMESTAMP,
             "updatedAt": firestore.SERVER_TIMESTAMP,
+            
+            # AR Compatibility Metadata (Android ARCore Optimized)
+            "arCompatible": True,
+            "platform": "android",              # Android only
+            "topology": "triangle",             # Triangle mesh for ARCore
+            "format": "glb",                    # GLB format for Android ARCore
+            "targetPolycount": 10000,           # Optimized 10k for Android devices
+            "optimizedForMobile": True,
+            "aiModel": "meshy-5",               # AI model version used
+            "hasPBR": True                      # PBR materials for realistic lighting
         }
 
         doc_ref = db.collection("generated_models_files").add(model_doc)

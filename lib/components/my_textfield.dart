@@ -107,7 +107,7 @@ class _MyTextfieldState extends State<MyTextfield> {
       return "Password must contain at least one special character";
     }
 
-    return null; // ✅ Valid
+    return null; // Valid
   }
 
   @override

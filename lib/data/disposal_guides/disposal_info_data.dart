@@ -54,9 +54,8 @@ class DisposalGuideService {
         'Don\'t burn plastic bottles',
       ],
       environmentalImpact:
-          '🌍 1 recycled plastic bottle saves enough energy to power a lightbulb for 3 hours. Recycling prevents 450 years of decomposition time in landfills.',
-      funFact:
-          '♻️ It takes about 25 recycled bottles to make one fleece jacket!',
+          '1 recycled plastic bottle saves enough energy to power a lightbulb for 3 hours. Recycling prevents 450 years of decomposition time in landfills.',
+      funFact: 'It takes about 25 recycled bottles to make one fleece jacket!',
     ),
     DisposalCategory.cans: DisposalInfo(
       category: DisposalCategory.cans,
@@ -85,9 +84,9 @@ class DisposalGuideService {
         'Don\'t throw in trash - cans are highly valuable',
       ],
       environmentalImpact:
-          '🌍 Recycling one aluminum can saves enough energy to run a TV for 3 hours. Aluminum can be recycled endlessly without quality loss, and recycled cans return to shelves in just 60 days!',
+          'Recycling one aluminum can saves enough energy to run a TV for 3 hours. Aluminum can be recycled endlessly without quality loss, and recycled cans return to shelves in just 60 days!',
       funFact:
-          '♻️ The aluminum can is the most recycled beverage container in the world!',
+          'The aluminum can is the most recycled beverage container in the world!',
     ),
     DisposalCategory.cartons: DisposalInfo(
       category: DisposalCategory.cartons,
@@ -116,9 +115,9 @@ class DisposalGuideService {
         'Don\'t include wax-coated cartons if not accepted locally',
       ],
       environmentalImpact:
-          '🌍 Recycling cartons saves trees and reduces landfill waste. One ton of recycled cartons saves 7,000 gallons of water and prevents 5 cubic yards of landfill space.',
+          'Recycling cartons saves trees and reduces landfill waste. One ton of recycled cartons saves 7,000 gallons of water and prevents 5 cubic yards of landfill space.',
       funFact:
-          '📦 Cartons can be recycled into tissues, paper towels, and even building materials!',
+          'Cartons can be recycled into tissues, paper towels, and even building materials!',
     ),
     DisposalCategory.unusedClothes: DisposalInfo(
       category: DisposalCategory.unusedClothes,
@@ -148,9 +147,9 @@ class DisposalGuideService {
         'Don\'t burn synthetic fabrics - releases toxins',
       ],
       environmentalImpact:
-          '🌍 The fashion industry produces 10% of global carbon emissions. Donating or recycling clothes extends their life, saving water, energy, and reducing landfill waste. One donated shirt saves 700 gallons of water!',
+          'The fashion industry produces 10% of global carbon emissions. Donating or recycling clothes extends their life, saving water, energy, and reducing landfill waste. One donated shirt saves 700 gallons of water!',
       funFact:
-          '👗 It takes 2,700 liters of water to make one cotton t-shirt - that\'s enough drinking water for one person for 2.5 years!',
+          'It takes 2,700 liters of water to make one cotton t-shirt - that\'s enough drinking water for one person for 2.5 years!',
     ),
   };
 
@@ -180,13 +179,13 @@ ${info.title}
 
 ${info.description}
 
-📋 Steps to Dispose:
+Steps to Dispose:
 ${info.steps.map((step) => '• $step').join('\n')}
 
-✅ DO:
+DO:
 ${info.dosList.take(3).map((item) => '• $item').join('\n')}
 
-❌ DON'T:
+DON'T:
 ${info.dontsList.take(3).map((item) => '• $item').join('\n')}
 
 ${info.environmentalImpact}

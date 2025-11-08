@@ -732,18 +732,18 @@ class _MeshyARCameraState extends State<MeshyARCamera> {
 
         bool? didAddNode =
             await arObjectManager!.addNode(node, planeAnchor: newAnchor);
-        debugPrint("📦 Node added result: $didAddNode");
+        debugPrint("Node added result: $didAddNode");
 
         // Add more detailed error checking
         if (didAddNode == null) {
-          debugPrint("⚠️ addNode returned null - possible plugin error");
+          debugPrint("addNode returned null - possible plugin error");
           setState(() {
             _statusMessage = "Plugin error - check logs";
           });
           await arAnchorManager!.removeAnchor(newAnchor);
           anchors.remove(newAnchor);
         } else if (didAddNode == false) {
-          debugPrint("❌ addNode returned false - node creation failed");
+          debugPrint("addNode returned false - node creation failed");
           debugPrint("   Troubleshooting:");
           debugPrint("   - File path: $localModelPath");
           debugPrint(

@@ -53,14 +53,14 @@ class CacheService {
       // Clear Firestore cache
       try {
         await _firestore.clearPersistence();
-        print('✅ Firestore cache cleared');
+        print('Firestore cache cleared');
       } catch (e) {
-        print('⚠️ Firestore cache clear warning: $e');
+        print('Firestore cache clear warning: $e');
         // This is expected if there are active listeners
       }
 
       final sizeMB = (deletedSize / (1024 * 1024)).toStringAsFixed(2);
-      print('✅ Cache cleared: $deletedFiles files, $sizeMB MB');
+      print('Cache cleared: $deletedFiles files, $sizeMB MB');
 
       return {
         'success': true,
@@ -69,7 +69,7 @@ class CacheService {
         'deletedSizeMB': sizeMB,
       };
     } catch (e) {
-      print('❌ Error clearing cache: $e');
+      print('Error clearing cache: $e');
       return {
         'success': false,
         'error': e.toString(),
@@ -113,7 +113,7 @@ class CacheService {
       }
 
       final sizeMB = (deletedSize / (1024 * 1024)).toStringAsFixed(2);
-      print('✅ Image cache cleared: $deletedFiles files, $sizeMB MB');
+      print('Image cache cleared: $deletedFiles files, $sizeMB MB');
 
       return {
         'success': true,
@@ -122,7 +122,7 @@ class CacheService {
         'deletedSizeMB': sizeMB,
       };
     } catch (e) {
-      print('❌ Error clearing image cache: $e');
+      print('Error clearing image cache: $e');
       return {
         'success': false,
         'error': e.toString(),
@@ -166,7 +166,7 @@ class CacheService {
       }
 
       final sizeMB = (deletedSize / (1024 * 1024)).toStringAsFixed(2);
-      print('✅ Video cache cleared: $deletedFiles files, $sizeMB MB');
+      print('Video cache cleared: $deletedFiles files, $sizeMB MB');
 
       return {
         'success': true,
@@ -175,7 +175,7 @@ class CacheService {
         'deletedSizeMB': sizeMB,
       };
     } catch (e) {
-      print('❌ Error clearing video cache: $e');
+      print('Error clearing video cache: $e');
       return {
         'success': false,
         'error': e.toString(),
@@ -232,7 +232,7 @@ class CacheService {
         'fileCount': fileCount,
       };
     } catch (e) {
-      print('❌ Error getting cache size: $e');
+      print('Error getting cache size: $e');
       return {
         'success': false,
         'error': e.toString(),

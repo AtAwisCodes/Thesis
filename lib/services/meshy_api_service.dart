@@ -294,7 +294,7 @@ class MeshyApiService {
       ).timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
-        print('✅ Backend is healthy!');
+        print('Backend is healthy!');
         return {
           'status': 'healthy',
           'url': baseUrl,
@@ -302,7 +302,7 @@ class MeshyApiService {
           'message': 'Backend is accessible and running correctly',
         };
       } else {
-        print('⚠️ Backend returned status: ${response.statusCode}');
+        print('Backend returned status: ${response.statusCode}');
         return {
           'status': 'error',
           'url': baseUrl,
@@ -311,7 +311,7 @@ class MeshyApiService {
         };
       }
     } catch (e) {
-      print('❌ Backend not reachable: $e');
+      print('Backend not reachable: $e');
 
       // Provide helpful error messages based on environment
       String helpMessage = '';
@@ -383,24 +383,24 @@ Troubleshooting:
     print('Current Environment: $currentEnvironment');
     print('Backend URL: $baseUrl');
     print('');
-    print('💡 TIPS:');
+    print('TIPS:');
     print('');
     if (_environment == BackendEnvironment.local) {
-      print('⚠️  You\'re using LOCAL mode - only works on same WiFi');
+      print('You\'re using LOCAL mode - only works on same WiFi');
       print('   To test from any network, use ngrok:');
       print('   1. Run: ngrok http 5000');
       print('   2. Update _ngrokUrl in meshy_api_service.dart');
       print('   3. Set _environment = BackendEnvironment.ngrok');
     } else if (_environment == BackendEnvironment.ngrok) {
-      print('✅ You\'re using NGROK mode - works from any network');
+      print('You\'re using NGROK mode - works from any network');
       print('   Remember: ngrok URL changes when you restart ngrok');
       print('   Current URL: $_ngrokUrl');
     } else {
-      print('✅ You\'re using PRODUCTION mode - works from any network');
+      print('You\'re using PRODUCTION mode - works from any network');
       print('   Deployment URL: $_productionUrl');
     }
     print('');
-    print('📦 For VIEWING models (no backend needed):');
+    print('For VIEWING models (no backend needed):');
     print('   Use: FirestoreModelService.getModelsForVideo(videoId)');
     print('   Works from ANY network without backend!');
     print('');

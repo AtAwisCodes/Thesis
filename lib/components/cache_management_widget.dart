@@ -50,8 +50,8 @@ class _CacheManagementWidgetState extends State<CacheManagementWidget> {
               Expanded(
                 child: Text(
                   result['success']
-                      ? '✅ Cleared ${result['deletedSizeMB']} MB'
-                      : '❌ Error: ${result['error']}',
+                      ? 'Cleared ${result['deletedSizeMB']} MB'
+                      : 'Error: ${result['error']}',
                 ),
               ),
             ],
@@ -79,8 +79,8 @@ class _CacheManagementWidgetState extends State<CacheManagementWidget> {
         SnackBar(
           content: Text(
             result['success']
-                ? '✅ Cleared ${result['deletedFiles']} images (${result['deletedSizeMB']} MB)'
-                : '❌ Error: ${result['error']}',
+                ? 'Cleared ${result['deletedFiles']} images (${result['deletedSizeMB']} MB)'
+                : 'Error: ${result['error']}',
           ),
           backgroundColor: result['success'] ? Colors.green : Colors.red,
         ),
@@ -104,8 +104,8 @@ class _CacheManagementWidgetState extends State<CacheManagementWidget> {
         SnackBar(
           content: Text(
             result['success']
-                ? '✅ Cleared ${result['deletedFiles']} videos (${result['deletedSizeMB']} MB)'
-                : '❌ Error: ${result['error']}',
+                ? 'Cleared ${result['deletedFiles']} videos (${result['deletedSizeMB']} MB)'
+                : 'Error: ${result['error']}',
           ),
           backgroundColor: result['success'] ? Colors.green : Colors.red,
         ),

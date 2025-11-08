@@ -37,9 +37,6 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
-
-      // Don't navigate manually - let the StreamBuilder in main_admin.dart handle it
-      // The authStateChanges stream will automatically show the dashboard
     } on FirebaseAuthException catch (e) {
       setState(() {
         _errorMessage = e.message ?? 'Login failed';
@@ -83,7 +80,7 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
                 ),
                 const SizedBox(height: 32),
                 const Text(
-                  '🛡️ ReXplore Admin',
+                  'ReXplore Admin',
                   style: TextStyle(
                     fontSize: 36,
                     fontWeight: FontWeight.bold,
