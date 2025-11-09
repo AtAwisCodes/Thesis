@@ -13,6 +13,7 @@ class YtVideoPlayer extends StatefulWidget {
   final String viewsCount;
   final String channelName;
   final String thumbnailUrl;
+  final String? channelAvatarUrl;
 
   const YtVideoPlayer({
     super.key,
@@ -21,6 +22,7 @@ class YtVideoPlayer extends StatefulWidget {
     required this.viewsCount,
     required this.channelName,
     required this.thumbnailUrl,
+    this.channelAvatarUrl,
   });
 
   @override
@@ -46,7 +48,7 @@ class _YtVideoPlayerState extends State<YtVideoPlayer> {
       _controller = YoutubePlayerController(
         initialVideoId: widget.videoId,
         flags: const YoutubePlayerFlags(
-          autoPlay: true,
+          autoPlay: false, // Changed to false to avoid embedding restrictions
           mute: false,
           enableCaption: false,
           hideControls: false,
@@ -58,19 +60,54 @@ class _YtVideoPlayerState extends State<YtVideoPlayer> {
           // Handle player errors
           try {
             if (_controller.value.hasError) {
+              final errorCode = _controller.value.errorCode.toString();
+              print(
+                  'YouTube Player Error: Code $errorCode for video ${widget.videoId}');
+
               if (mounted) {
+                String errorMessage = 'Video playback error';
+                bool canOpenInYouTube = false;
+
+                // Detailed error messages based on error code
+                switch (errorCode) {
+                  case '2':
+                    errorMessage = 'Invalid video ID';
+                    break;
+                  case '5':
+                    errorMessage = 'HTML5 player error';
+                    break;
+                  case '100':
+                    errorMessage = 'Video not found or is private';
+                    break;
+                  case '101':
+                  case '150':
+                  case '152':
+                    errorMessage =
+                        'This video cannot be embedded. The owner has restricted playback outside YouTube.';
+                    canOpenInYouTube = true;
+                    break;
+                  default:
+                    errorMessage =
+                        'Video playback error (Code: $errorCode). This video may be restricted or unavailable.';
+                    canOpenInYouTube = true;
+                }
+
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text(
-                      'Video playback error: ${_controller.value.errorCode}. This video may be restricted or unavailable.',
-                    ),
-                    duration: const Duration(seconds: 5),
+                    content: Text(errorMessage),
+                    duration: const Duration(seconds: 6),
                     backgroundColor: Colors.red,
-                    action: SnackBarAction(
-                      label: 'Dismiss',
-                      textColor: Colors.white,
-                      onPressed: () {},
-                    ),
+                    action: canOpenInYouTube
+                        ? SnackBarAction(
+                            label: 'Open in YouTube',
+                            textColor: Colors.white,
+                            onPressed: () => _openYouTubeVideo(),
+                          )
+                        : SnackBarAction(
+                            label: 'Dismiss',
+                            textColor: Colors.white,
+                            onPressed: () {},
+                          ),
                   ),
                 );
               }
@@ -225,6 +262,52 @@ class _YtVideoPlayerState extends State<YtVideoPlayer> {
     description.write("Like, follow, and share to support the creator.");
 
     return description.toString();
+  }
+
+  /// Toggle video favorite status
+  void _toggleFavorites() {
+    setState(() {
+      _isFavorited = !_isFavorited;
+      if (_isFavorited) {
+        FavoritesManager.instance.addFavorite({
+          'id': widget.videoId,
+          'title': widget.videoTitle,
+          'channel': widget.channelName,
+          'thumbnail': widget.thumbnailUrl,
+          'views': widget.viewsCount,
+          'videoType': 'youtube',
+          'channelAvatarUrl': widget.channelAvatarUrl,
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.bookmark, color: Colors.white),
+                SizedBox(width: 8),
+                Text('Added to favorites'),
+              ],
+            ),
+            backgroundColor: Color(0xff5BEC84),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      } else {
+        FavoritesManager.instance.removeFavorite(widget.videoId);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.bookmark_border, color: Colors.white),
+                SizedBox(width: 8),
+                Text('Removed from favorites'),
+              ],
+            ),
+            backgroundColor: Colors.grey,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    });
   }
 
   /// Build the toggle section with Steps and Information tabs
@@ -453,7 +536,7 @@ class _YtVideoPlayerState extends State<YtVideoPlayer> {
         const Divider(height: 24),
         _buildInfoRow(Icons.title, 'Title', widget.videoTitle),
         const Divider(height: 24),
-        _buildInfoRow(Icons.person, 'Channel', widget.channelName),
+        _buildChannelInfoRow(),
         const Divider(height: 24),
         _buildInfoRow(Icons.visibility, 'Views', widget.viewsCount),
         const Divider(height: 24),
@@ -521,6 +604,58 @@ class _YtVideoPlayerState extends State<YtVideoPlayer> {
     );
   }
 
+  /// Build channel information row with avatar
+  Widget _buildChannelInfoRow() {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Channel avatar or icon
+        widget.channelAvatarUrl != null && widget.channelAvatarUrl!.isNotEmpty
+            ? CircleAvatar(
+                radius: 20,
+                backgroundImage: NetworkImage(widget.channelAvatarUrl!),
+                backgroundColor: Colors.grey[300],
+              )
+            : CircleAvatar(
+                radius: 20,
+                backgroundColor: const Color(0xff5BEC84).withOpacity(0.2),
+                child: const Icon(
+                  Icons.person,
+                  size: 20,
+                  color: Color(0xff5BEC84),
+                ),
+              ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Channel',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                widget.channelName,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Theme.of(context)
+                      .textTheme
+                      .bodyMedium
+                      ?.color
+                      ?.withOpacity(0.7),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -570,6 +705,26 @@ class _YtVideoPlayerState extends State<YtVideoPlayer> {
                   title: widget.videoTitle,
                   details: _buildVideoDescription(),
                   maxLinesCollapsed: 2,
+                  actionButton: Container(
+                    decoration: BoxDecoration(
+                      color: _isFavorited
+                          ? const Color(0xff5BEC84).withOpacity(0.2)
+                          : Colors.grey.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: IconButton(
+                      icon: Icon(
+                        _isFavorited ? Icons.bookmark : Icons.bookmark_border,
+                        color: _isFavorited
+                            ? const Color(0xff5BEC84)
+                            : Colors.grey[600],
+                      ),
+                      onPressed: _toggleFavorites,
+                      tooltip: _isFavorited
+                          ? 'Remove from favorites'
+                          : 'Add to favorites',
+                    ),
+                  ),
                 ),
 
                 // Channel thumbnail + actions
@@ -618,51 +773,9 @@ class _YtVideoPlayerState extends State<YtVideoPlayer> {
                                     if (isLiked) {
                                       isDisliked = false;
                                       _likeCount++;
-                                      _isFavorited = true;
-                                      FavoritesManager.instance.addFavorite({
-                                        'id': widget.videoId,
-                                        'title': widget.videoTitle,
-                                        'channel': widget.channelName,
-                                        'thumbnail': widget.thumbnailUrl,
-                                        'views': widget.viewsCount,
-                                        'videoType': 'youtube',
-                                      });
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(
-                                        const SnackBar(
-                                          content: Row(
-                                            children: [
-                                              Icon(Icons.bookmark,
-                                                  color: Colors.white),
-                                              SizedBox(width: 8),
-                                              Text('Added to favorites'),
-                                            ],
-                                          ),
-                                          backgroundColor: Colors.green,
-                                          duration: Duration(seconds: 2),
-                                        ),
-                                      );
                                     } else {
                                       _likeCount =
                                           _likeCount > 0 ? _likeCount - 1 : 0;
-                                      _isFavorited = false;
-                                      FavoritesManager.instance
-                                          .removeFavorite(widget.videoId);
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(
-                                        const SnackBar(
-                                          content: Row(
-                                            children: [
-                                              Icon(Icons.bookmark_border,
-                                                  color: Colors.white),
-                                              SizedBox(width: 8),
-                                              Text('Removed from favorites'),
-                                            ],
-                                          ),
-                                          backgroundColor: Colors.grey,
-                                          duration: Duration(seconds: 2),
-                                        ),
-                                      );
                                     }
                                   });
                                 },
@@ -687,13 +800,8 @@ class _YtVideoPlayerState extends State<YtVideoPlayer> {
                                 isDisliked = !isDisliked;
                                 if (isDisliked) {
                                   isLiked = false;
-                                  if (_isFavorited) {
-                                    _likeCount =
-                                        _likeCount > 0 ? _likeCount - 1 : 0;
-                                    _isFavorited = false;
-                                    FavoritesManager.instance
-                                        .removeFavorite(widget.videoId);
-                                  }
+                                  _likeCount =
+                                      _likeCount > 0 ? _likeCount - 1 : 0;
                                 }
                               });
                             },

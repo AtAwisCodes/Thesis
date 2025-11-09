@@ -89,19 +89,20 @@ def generate_3d_model():
                 "error": "modelImages missing or less than 3 images required"
             }), 400
 
-        # Step 2: Send to Meshy AI with OPTIMIZED AR parameters (Android ARCore Only)
+        # Step 2: Send to Meshy AI with SIZE-OPTIMIZED AR parameters (Android ARCore Only)
         payload = {
             "image_urls": image_urls,
             
-            # Core AR Optimization Settings for Android
+            # Core AR Optimization Settings for Android (Size-Optimized)
             "ai_model": "meshy-5",              # Meshy-5 for stable multi-image generation
             "topology": "triangle",             # Triangle mesh for ARCore compatibility
-            "target_polycount": 10000,          # 10k polygons - optimized for Android devices
+            "target_polycount": 5000,           # 5k polygons - REDUCED for smaller file size & fast download
             "should_remesh": True,              # Enable remeshing for clean topology
             
-            # Texture Settings for AR
+            # Texture Settings for AR (Size-Optimized)
             "should_texture": True,             # Generate textures
-            "enable_pbr": True,                 # PBR maps (metallic, roughness, normal) for realistic AR lighting
+            "enable_pbr": True,                 # PBR maps for realistic AR lighting
+            "texture_richness": "medium",       # Medium quality for smaller file size (low/medium/high)
             
             # Format Specification - Android Only
             "target_formats": ["glb"],          # GLB only for Android ARCore
@@ -110,15 +111,17 @@ def generate_3d_model():
             "symmetry_mode": "auto"             # Auto-detect symmetry for better mesh quality
         }
 
-        print(f"    Sending {len(image_urls)} images to Meshy AI...")
-        print(f"    Android ARCore Configuration:")
+        print(f" Sending {len(image_urls)} images to Meshy AI...")
+        print(f" Android ARCore Configuration (Size-Optimized):")
         print(f"   - AI Model: {payload['ai_model']}")
         print(f"   - Topology: {payload['topology']} (triangulated mesh)")
-        print(f"   - Target Polycount: {payload['target_polycount']:,}")
+        print(f"   - Target Polycount: {payload['target_polycount']:,} (reduced for faster download)")
+        print(f"   - Texture Richness: {payload['texture_richness']} (medium quality for smaller file)")
         print(f"   - Remesh: {payload['should_remesh']}")
         print(f"   - PBR Textures: {payload['enable_pbr']}")
         print(f"   - Format: GLB (Android ARCore only)")
         print(f"   - Symmetry: {payload['symmetry_mode']}")
+        print(f"   📦 Expected file size: ~1-2 MB (fast download on mobile data)")
         response = requests.post(
             "https://api.meshy.ai/openapi/v1/multi-image-to-3d",
             headers=get_meshy_headers(),
@@ -271,13 +274,15 @@ def fetch_generated_model():
             "createdAt": firestore.SERVER_TIMESTAMP,
             "updatedAt": firestore.SERVER_TIMESTAMP,
             
-            # AR Compatibility Metadata (Android ARCore Optimized)
+            # AR Compatibility Metadata (Android ARCore Size-Optimized)
             "arCompatible": True,
             "platform": "android",              # Android only
             "topology": "triangle",             # Triangle mesh for ARCore
             "format": "glb",                    # GLB format for Android ARCore
-            "targetPolycount": 10000,           # Optimized 10k for Android devices
+            "targetPolycount": 5000,            # Reduced to 5k for smaller file size
+            "textureRichness": "medium",        # Medium quality textures
             "optimizedForMobile": True,
+            "optimizedForDownload": True,       # Size-optimized for mobile data
             "aiModel": "meshy-5",               # AI model version used
             "hasPBR": True                      # PBR materials for realistic lighting
         }
@@ -537,13 +542,15 @@ def fetch_and_save_model_internal(task_id, user_id, video_id):
             "createdAt": firestore.SERVER_TIMESTAMP,
             "updatedAt": firestore.SERVER_TIMESTAMP,
             
-            # AR Compatibility Metadata (Android ARCore Optimized)
+            # AR Compatibility Metadata (Android ARCore Size-Optimized)
             "arCompatible": True,
             "platform": "android",              # Android only
             "topology": "triangle",             # Triangle mesh for ARCore
             "format": "glb",                    # GLB format for Android ARCore
-            "targetPolycount": 10000,           # Optimized 10k for Android devices
+            "targetPolycount": 5000,            # Reduced to 5k for smaller file size
+            "textureRichness": "medium",        # Medium quality textures
             "optimizedForMobile": True,
+            "optimizedForDownload": True,       # Size-optimized for mobile data
             "aiModel": "meshy-5",               # AI model version used
             "hasPBR": True                      # PBR materials for realistic lighting
         }

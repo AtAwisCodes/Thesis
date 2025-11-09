@@ -4,7 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import 'package:video_player/video_player.dart';
-import 'dart:html' as html;
+import 'package:url_launcher/url_launcher.dart';
 
 class ReportDetailPage extends StatefulWidget {
   final String reportId;
@@ -435,13 +435,18 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                                       ),
                                       const SizedBox(height: 24),
                                       ElevatedButton.icon(
-                                        onPressed: () {
-                                          // Open video in new tab
-                                          html.window.open(videoUrl, '_blank');
+                                        onPressed: () async {
+                                          // Open video in external browser/app
+                                          final uri = Uri.parse(videoUrl);
+                                          if (await canLaunchUrl(uri)) {
+                                            await launchUrl(uri,
+                                                mode: LaunchMode
+                                                    .externalApplication);
+                                          }
                                         },
                                         icon: const Icon(Icons.open_in_new),
                                         label:
-                                            const Text('Open Video in New Tab'),
+                                            const Text('Open Video Externally'),
                                         style: ElevatedButton.styleFrom(
                                           backgroundColor: Colors.deepPurple,
                                           foregroundColor: Colors.white,

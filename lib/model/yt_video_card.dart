@@ -23,6 +23,7 @@ class YoutubeVideoCard extends StatelessWidget {
               viewsCount: ytVideo.viewsCount,
               channelName: ytVideo.channelName,
               thumbnailUrl: ytVideo.thumbnailUrl,
+              channelAvatarUrl: ytVideo.channelAvatarUrl,
             ),
           ),
         );

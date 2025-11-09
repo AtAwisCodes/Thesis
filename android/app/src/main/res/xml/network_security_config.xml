@@ -5,6 +5,12 @@
         <domain includeSubdomains="true">supabase.co</domain>
         <domain includeSubdomains="true">ynjqcaxxofteqfbcnbpy.supabase.co</domain>
         <domain includeSubdomains="true">assets.meshy.ai</domain>
+        <!-- YouTube domains for video playback -->
+        <domain includeSubdomains="true">youtube.com</domain>
+        <domain includeSubdomains="true">googleapis.com</domain>
+        <domain includeSubdomains="true">ytimg.com</domain>
+        <domain includeSubdomains="true">googlevideo.com</domain>
+        <domain includeSubdomains="true">youtu.be</domain>
     </domain-config>
     <base-config cleartextTrafficPermitted="true">
         <trust-anchors>
