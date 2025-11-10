@@ -92,8 +92,8 @@ class _LandingPage extends State<LandingPage> {
               },
               style: ElevatedButton.styleFrom(
                 padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                backgroundColor: Colors.green[700],
-                foregroundColor: Colors.white,
+                backgroundColor: Color(0xff5BEC84),
+                foregroundColor: Color(0xff1A1A1A),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),

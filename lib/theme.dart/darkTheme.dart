@@ -163,6 +163,13 @@ final ThemeData darkTheme = ThemeData(
     ),
   ),
 
+  iconButtonTheme: IconButtonThemeData(
+    style: IconButton.styleFrom(
+      foregroundColor: const Color(0xff5BEC84),
+      iconSize: 24,
+    ),
+  ),
+
   // Input Fields - Clean & Consistent
   inputDecorationTheme: InputDecorationTheme(
     filled: true,

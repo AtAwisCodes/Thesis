@@ -190,7 +190,7 @@ class _CacheManagementWidgetState extends State<CacheManagementWidget> {
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   backgroundColor: theme.colorScheme.primary,
-                  foregroundColor: Colors.white,
+                  foregroundColor: theme.colorScheme.onPrimary,
                 ),
               ),
             ),

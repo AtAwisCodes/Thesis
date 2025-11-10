@@ -8,8 +8,8 @@ class InputLimits {
   static const int middleInitial = 1;
 
   // Profile fields
-  static const int displayName = 100;
-  static const int bio = 500;
+  static const int displayName = 25;
+  static const int bio = 50;
 
   // Video fields
   static const int videoTitle = 100;

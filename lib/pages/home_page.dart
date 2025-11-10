@@ -11,7 +11,6 @@ import 'package:rexplore/pages/notif_page.dart';
 import 'package:rexplore/pages/profile_page.dart';
 import 'package:rexplore/pages/upload_page.dart';
 import 'package:rexplore/pages/videos_page.dart';
-import 'package:rexplore/pages/search_bar.dart';
 import 'package:rexplore/services/ThemeProvider.dart';
 import 'package:rexplore/services/auth_service.dart';
 import 'package:rexplore/viewmodel/yt_videoview_model.dart';
@@ -56,16 +55,19 @@ class _HomePageState extends State<HomePage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text(
+              child: Text(
                 'Cancel',
-                style: TextStyle(color: Colors.grey),
+                style: TextStyle(
+                  color:
+                      Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                ),
               ),
             ),
             ElevatedButton(
               onPressed: () => Navigator.of(context).pop(true),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                foregroundColor: Colors.white,
+                backgroundColor: Theme.of(context).colorScheme.error,
+                foregroundColor: Theme.of(context).colorScheme.onError,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
@@ -110,33 +112,23 @@ class _HomePageState extends State<HomePage> {
               ),
         ),
         centerTitle: false,
-        leading: page == 4
-            ? Builder(
-                builder: (context) => IconButton(
-                  icon: Icon(
-                    Icons.menu,
-                    size: responsive.iconSize(24),
+        actions: page != 2
+            ? [
+                Builder(
+                  builder: (context) => IconButton(
+                    icon: Icon(
+                      Icons.menu,
+                      size: responsive.iconSize(24),
+                    ),
+                    onPressed: () => Scaffold.of(context).openDrawer(),
                   ),
-                  onPressed: () => Scaffold.of(context).openDrawer(),
                 ),
-              )
+              ]
             : null,
-        actions: [
-          if (page == 0)
-            IconButton(
-              icon: Icon(
-                Icons.search,
-                size: responsive.iconSize(24),
-              ),
-              onPressed: () {
-                showSearch(context: context, delegate: MySearchDelegate());
-              },
-            ),
-        ],
       ),
 
       // Drawer
-      drawer: (page == 4)
+      drawer: (page != 2)
           ? Drawer(
               child: StreamBuilder<DocumentSnapshot>(
                 stream: currentUser != null
@@ -209,61 +201,9 @@ class _HomePageState extends State<HomePage> {
             )
           : null,
 
-      body: Column(
-        children: [
-          if (page == 0)
-            Consumer<YtVideoviewModel>(
-              builder: (context, ytVideoViewModel, _) {
-                if (ytVideoViewModel.searchQuery.isNotEmpty) {
-                  return Container(
-                    width: double.infinity,
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.green.withOpacity(0.1),
-                      border: Border(
-                        bottom:
-                            BorderSide(color: Colors.green.withOpacity(0.3)),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.filter_alt,
-                            size: 18, color: Colors.green),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Filtering by: "${ytVideoViewModel.searchQuery}"',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              color: Colors.green,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.close,
-                              size: 18, color: Colors.green),
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                          onPressed: () {
-                            ytVideoViewModel.clearSearch();
-                          },
-                        ),
-                      ],
-                    ),
-                  );
-                }
-                return const SizedBox.shrink();
-              },
-            ),
-          Expanded(
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 300),
-              child: getSelectedWidget(page: page),
-            ),
-          ),
-        ],
+      body: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 300),
+        child: getSelectedWidget(page: page),
       ),
 
       //Camera Floating Action Button AI - Only visible on home page

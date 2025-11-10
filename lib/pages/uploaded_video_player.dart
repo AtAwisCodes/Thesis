@@ -1013,8 +1013,9 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
                               ),
                               const SizedBox(width: 8),
                               IconButton(
-                                icon: const Icon(Icons.send,
-                                    color: Colors.black54),
+                                icon: Icon(Icons.send,
+                                    color:
+                                        Theme.of(context).colorScheme.primary),
                                 onPressed: () async {
                                   if (_dialogCommentController
                                       .text.isNotEmpty) {
@@ -1391,6 +1392,7 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
       appBar: AppBar(
         elevation: 0,
         backgroundColor: Colors.transparent,
+        automaticallyImplyLeading: false,
         actions: [
           // Report button
           IconButton(

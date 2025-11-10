@@ -155,8 +155,10 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
                           icon: const Icon(Icons.arrow_back),
                           label: const Text('Back to Browse'),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green,
-                            foregroundColor: Colors.white,
+                            backgroundColor:
+                                Theme.of(context).colorScheme.primary,
+                            foregroundColor:
+                                Theme.of(context).colorScheme.onPrimary,
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 24, vertical: 12),
                             shape: RoundedRectangleBorder(

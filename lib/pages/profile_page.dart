@@ -181,24 +181,26 @@ class _ProfilePageState extends State<ProfilePage> {
               const SizedBox(height: 16),
               TextField(
                 controller: nameController,
-                maxLength: 100,
+                maxLength: 25,
                 decoration: InputDecoration(
                   labelText: 'Name',
                   counterStyle: TextStyle(
-                    color: Colors.grey[600],
-                    fontSize: 11,
+                    color: Colors.blue[700],
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ),
               TextField(
                 controller: bioController,
-                maxLength: 500,
+                maxLength: 50,
                 maxLines: 3,
                 decoration: InputDecoration(
                   labelText: 'Bio',
                   counterStyle: TextStyle(
-                    color: Colors.grey[600],
-                    fontSize: 11,
+                    color: Colors.blue[700],
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ),

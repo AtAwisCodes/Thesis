@@ -117,7 +117,10 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+              foregroundColor: Theme.of(context).colorScheme.onError,
+            ),
             child: const Text('Delete'),
           ),
         ],
@@ -182,7 +185,12 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              foregroundColor: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.black
+                  : Colors.white,
+            ),
             child: const Text('Restore'),
           ),
         ],
@@ -449,7 +457,11 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                                             const Text('Open Video Externally'),
                                         style: ElevatedButton.styleFrom(
                                           backgroundColor: Colors.deepPurple,
-                                          foregroundColor: Colors.white,
+                                          foregroundColor:
+                                              Theme.of(context).brightness ==
+                                                      Brightness.dark
+                                                  ? Colors.white
+                                                  : Colors.white,
                                           padding: const EdgeInsets.symmetric(
                                             horizontal: 24,
                                             vertical: 16,
@@ -474,7 +486,10 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                                         icon: const Icon(Icons.copy),
                                         label: const Text('Copy Video URL'),
                                         style: TextButton.styleFrom(
-                                          foregroundColor: Colors.white70,
+                                          foregroundColor: Theme.of(context)
+                                              .colorScheme
+                                              .onSurface
+                                              .withOpacity(0.7),
                                         ),
                                       ),
                                     ],
@@ -663,7 +678,11 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                                   label: const Text('Mark as Reviewing'),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: Colors.blue,
-                                    foregroundColor: Colors.white,
+                                    foregroundColor:
+                                        Theme.of(context).brightness ==
+                                                Brightness.dark
+                                            ? Colors.black
+                                            : Colors.white,
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: 20,
                                       vertical: 12,
@@ -678,7 +697,11 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                                 label: const Text('Send Warning'),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.orange,
-                                  foregroundColor: Colors.white,
+                                  foregroundColor:
+                                      Theme.of(context).brightness ==
+                                              Brightness.dark
+                                          ? Colors.black
+                                          : Colors.white,
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 20,
                                     vertical: 12,
@@ -694,7 +717,11 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                                   label: const Text('Restore Video'),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: Colors.green,
-                                    foregroundColor: Colors.white,
+                                    foregroundColor:
+                                        Theme.of(context).brightness ==
+                                                Brightness.dark
+                                            ? Colors.black
+                                            : Colors.white,
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: 20,
                                       vertical: 12,
@@ -709,7 +736,11 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                                   label: const Text('Delete Video'),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: Colors.red,
-                                    foregroundColor: Colors.white,
+                                    foregroundColor:
+                                        Theme.of(context).brightness ==
+                                                Brightness.dark
+                                            ? Colors.black
+                                            : Colors.white,
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: 20,
                                       vertical: 12,
@@ -727,7 +758,11 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                                   label: const Text('Mark as Resolved'),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: Colors.green,
-                                    foregroundColor: Colors.white,
+                                    foregroundColor:
+                                        Theme.of(context).brightness ==
+                                                Brightness.dark
+                                            ? Colors.black
+                                            : Colors.white,
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: 20,
                                       vertical: 12,

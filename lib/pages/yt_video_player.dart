@@ -48,7 +48,7 @@ class _YtVideoPlayerState extends State<YtVideoPlayer> {
       _controller = YoutubePlayerController(
         initialVideoId: widget.videoId,
         flags: const YoutubePlayerFlags(
-          autoPlay: false, // Changed to false to avoid embedding restrictions
+          autoPlay: true,
           mute: false,
           enableCaption: false,
           hideControls: false,
@@ -662,6 +662,7 @@ class _YtVideoPlayerState extends State<YtVideoPlayer> {
       appBar: AppBar(
         elevation: 0,
         backgroundColor: Colors.transparent,
+        automaticallyImplyLeading: false,
       ),
       body: SingleChildScrollView(
         child: YoutubePlayerBuilder(
@@ -863,6 +864,7 @@ class _YtVideoPlayerState extends State<YtVideoPlayer> {
                             onPressed: () => Navigator.pop(context, true),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.red,
+                              foregroundColor: Colors.white,
                             ),
                             child: const Text('Open YouTube'),
                           ),

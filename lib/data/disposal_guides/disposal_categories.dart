@@ -25,13 +25,13 @@ extension DisposalCategoryExtension on DisposalCategory {
   String get icon {
     switch (this) {
       case DisposalCategory.plasticBottles:
-        return '[bottle]';
+        return '🍾';
       case DisposalCategory.cans:
-        return '[can]';
+        return '🥫';
       case DisposalCategory.cartons:
-        return '[box]';
+        return '📦';
       case DisposalCategory.unusedClothes:
-        return '[clothes]';
+        return '👕';
     }
   }
 

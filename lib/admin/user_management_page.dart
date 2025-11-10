@@ -145,7 +145,9 @@ class _UserManagementPageState extends State<UserManagementPage> {
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.orange,
-              foregroundColor: Colors.white,
+              foregroundColor: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.black
+                  : Colors.white,
             ),
             child: const Text('Suspend User'),
           ),
@@ -236,7 +238,9 @@ class _UserManagementPageState extends State<UserManagementPage> {
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.green,
-              foregroundColor: Colors.white,
+              foregroundColor: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.black
+                  : Colors.white,
             ),
             child: const Text('Unsuspend'),
           ),
@@ -376,7 +380,9 @@ class _UserManagementPageState extends State<UserManagementPage> {
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
+              foregroundColor: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.white
+                  : Colors.white,
             ),
             child: const Text('Delete Account'),
           ),
@@ -477,7 +483,9 @@ class _UserManagementPageState extends State<UserManagementPage> {
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.blue,
-              foregroundColor: Colors.white,
+              foregroundColor: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.black
+                  : Colors.white,
             ),
             child: const Text('Restore'),
           ),
@@ -856,7 +864,10 @@ class _UserManagementPageState extends State<UserManagementPage> {
                     label: const Text('Unsuspend'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green,
-                      foregroundColor: Colors.white,
+                      foregroundColor:
+                          Theme.of(context).brightness == Brightness.dark
+                              ? Colors.black
+                              : Colors.white,
                     ),
                   ),
                 if (!isDeleted)
@@ -875,7 +886,10 @@ class _UserManagementPageState extends State<UserManagementPage> {
                     label: const Text('Restore'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blue,
-                      foregroundColor: Colors.white,
+                      foregroundColor:
+                          Theme.of(context).brightness == Brightness.dark
+                              ? Colors.black
+                              : Colors.white,
                     ),
                   ),
               ],
