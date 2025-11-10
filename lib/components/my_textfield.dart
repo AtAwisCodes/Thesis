@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:rexplore/constants/input_limits.dart';
+import 'package:rexplore/utilities/responsive_helper.dart';
 
 class MyTextfield extends StatefulWidget {
   final TextEditingController controller;
@@ -113,15 +114,19 @@ class _MyTextfieldState extends State<MyTextfield> {
   @override
   Widget build(BuildContext context) {
     final maxLen = _getMaxLength();
+    final responsive = context.responsive;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 25.0, vertical: 8.0),
+      padding: responsive.padding(horizontal: 25, vertical: 8),
       child: TextFormField(
         controller: widget.controller,
         obscureText: _isObscured,
-        style: const TextStyle(color: Colors.white),
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: responsive.fontSize(14),
+        ),
         cursorColor: Colors.blueAccent,
-        validator: _validatePassword, // Apply validation (Goal 2)
+        validator: _validatePassword,
         maxLength: maxLen,
         inputFormatters:
             maxLen != null ? [LengthLimitingTextInputFormatter(maxLen)] : null,
@@ -129,7 +134,7 @@ class _MyTextfieldState extends State<MyTextfield> {
           labelText: widget.hintText,
           labelStyle: TextStyle(
             color: Colors.grey[400],
-            fontSize: 14,
+            fontSize: responsive.fontSize(14),
             fontWeight: FontWeight.w500,
           ),
           floatingLabelBehavior: FloatingLabelBehavior.auto,
@@ -138,13 +143,13 @@ class _MyTextfieldState extends State<MyTextfield> {
           // Hide the default counter for a cleaner look
           counterText: '',
 
-          // Goal 1: Eye toggle only for password fields
           suffixIcon: (widget.hintText.toLowerCase() == "password" ||
                   widget.hintText.toLowerCase() == "confirm password")
               ? IconButton(
                   icon: Icon(
                     _isObscured ? Icons.visibility_off : Icons.visibility,
                     color: Colors.grey,
+                    size: responsive.iconSize(20),
                   ),
                   onPressed: () {
                     setState(() {
@@ -156,16 +161,18 @@ class _MyTextfieldState extends State<MyTextfield> {
 
           enabledBorder: OutlineInputBorder(
             borderSide: BorderSide(color: Colors.grey[700]!),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(responsive.borderRadius(12)),
           ),
           focusedBorder: OutlineInputBorder(
             borderSide: const BorderSide(color: Colors.blueAccent, width: 2),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(responsive.borderRadius(12)),
           ),
           filled: true,
-          fillColor: const Color(0xFF2A2A3C), // updated dark tone
-          contentPadding:
-              const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
+          fillColor: const Color(0xFF2A2A3C),
+          contentPadding: responsive.padding(
+            vertical: 18,
+            horizontal: 16,
+          ),
         ),
       ),
     );

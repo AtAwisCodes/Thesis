@@ -12,15 +12,16 @@ class FirebaseService {
     required int age,
     required String email,
     String bio = 'bio',
+    String? uid, // Optional UID parameter
   }) async {
     try {
-      final currentUser = _auth.currentUser;
-      if (currentUser == null) {
-        print('No user logged in');
+      // Use provided UID or get current user's UID
+      final userId = uid ?? _auth.currentUser?.uid;
+
+      if (userId == null) {
+        print('No user ID available');
         return false;
       }
-
-      final uid = currentUser.uid;
 
       Map<String, dynamic> userData = {
         'first_name': firstName,
@@ -32,7 +33,18 @@ class FirebaseService {
         'created_at': FieldValue.serverTimestamp(),
       };
 
-      await _firestore.collection('count').doc(uid).set(userData);
+      await _firestore.collection('count').doc(userId).set(userData);
+
+      // Also create initial user document in 'users' collection for admin management
+      await _firestore.collection('users').doc(userId).set({
+        'displayName': '$firstName $lastName',
+        'email': email,
+        'avatarUrl': '',
+        'createdAt': FieldValue.serverTimestamp(),
+        'isSuspended': false,
+        'isDeleted': false,
+      });
+
       return true;
     } catch (e) {
       print('Error creating user: $e');

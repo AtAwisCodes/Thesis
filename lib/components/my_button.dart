@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:rexplore/utilities/responsive_helper.dart';
 
 class MyButton extends StatelessWidget {
   final Function()? onTap;
@@ -8,26 +9,28 @@ class MyButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final responsive = context.responsive;
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
-      padding: EdgeInsets.all(15),
-      margin: EdgeInsets.symmetric(horizontal: 25),
-      decoration: BoxDecoration(
-          color: Colors.blueAccent, 
-          borderRadius: BorderRadius.circular(20)
-          ),
-          child: Center(
+        padding: responsive.padding(all: 15),
+        margin: responsive.padding(horizontal: 25),
+        decoration: BoxDecoration(
+          color: Colors.blueAccent,
+          borderRadius: BorderRadius.circular(responsive.borderRadius(20)),
+        ),
+        child: Center(
           child: Text(
             text,
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-            fontSize: 16,
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: responsive.fontSize(16),
+            ),
           ),
-          ),
-          ),
-          ),
-          );
+        ),
+      ),
+    );
   }
 }

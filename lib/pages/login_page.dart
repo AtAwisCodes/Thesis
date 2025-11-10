@@ -5,6 +5,7 @@ import 'package:rexplore/components/my_textfield.dart';
 import 'package:rexplore/components/square_tile.dart';
 import 'package:rexplore/services/auth_service.dart';
 import 'package:rexplore/utilities/disposable_email_checker.dart';
+import 'package:rexplore/utilities/responsive_helper.dart';
 
 class LoginPage extends StatefulWidget {
   final Function()? onTap;
@@ -209,60 +210,33 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
+    final responsive = context.responsive;
+
     return Dialog(
       backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.all(12),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          double screenWidth = constraints.maxWidth;
-          double screenHeight = constraints.maxHeight;
-
-          // Clamp text sizes
-          double titleSize = (screenWidth * 0.08).clamp(20, 32);
-          double subtitleSize = (screenWidth * 0.04).clamp(14, 18);
-          double textSize = (screenWidth * 0.032).clamp(12, 16);
-
-          return Stack(
-            children: [
-              _cardDialog(
-                  screenWidth, screenHeight, titleSize, subtitleSize, textSize),
-              Positioned(
-                top: 0,
-                right: screenWidth * 0.04,
-                height: screenHeight * 0.04,
-                width: screenHeight * 0.04,
-                child: OutlinedButton(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                  },
-                  style: OutlinedButton.styleFrom(
-                    padding: EdgeInsets.all(screenHeight * 0.005),
-                    shape: const CircleBorder(),
-                    backgroundColor: Colors.transparent,
-                    side: BorderSide.none,
-                  ),
-                  child: Icon(Icons.cancel, size: screenHeight * 0.035),
-                ),
-              )
-            ],
-          );
-        },
+      insetPadding: responsive.padding(all: 12),
+      child: Stack(
+        children: [
+          _cardDialog(context),
+        ],
       ),
     );
   }
 
-  Widget _cardDialog(double screenWidth, double screenHeight, double titleSize,
-      double subtitleSize, double textSize) {
+  Widget _cardDialog(BuildContext context) {
+    final responsive = context.responsive;
+    final textHelper = ResponsiveText(responsive);
+
     return Container(
       constraints: const BoxConstraints(maxWidth: 500),
-      padding: EdgeInsets.symmetric(
-        vertical: screenHeight * 0.02,
-        horizontal: screenWidth * 0.06,
+      padding: responsive.padding(
+        vertical: 16,
+        horizontal: 20,
       ),
-      margin: EdgeInsets.all(screenWidth * 0.04),
+      margin: responsive.padding(all: 16),
       decoration: BoxDecoration(
         color: const Color(0xff2A303E),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(responsive.borderRadius(12)),
       ),
       child: SafeArea(
         child: Center(
@@ -272,58 +246,59 @@ class _LoginPageState extends State<LoginPage> {
               children: [
                 Text(
                   'Welcome!',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: titleSize,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: textHelper.headlineLarge(context).copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
                 ),
+                SizedBox(height: responsive.spacing(8)),
                 Text(
                   'Login to your account!',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: subtitleSize,
-                  ),
+                  style: textHelper.bodyLarge(context).copyWith(
+                        color: Colors.white,
+                      ),
                 ),
-                SizedBox(height: screenHeight * 0.03),
+                SizedBox(height: responsive.spacing(24)),
 
                 // Email
                 MyTextfield(
                   controller: emailController,
                   hintText: 'Email',
                   obscureText: false,
-                  enforceLimit: false, // No character limit on login
+                  enforceLimit: false,
                 ),
-                SizedBox(height: screenHeight * 0.015),
+                SizedBox(height: responsive.spacing(12)),
 
                 // Password
                 MyTextfield(
                   controller: passwordController,
                   hintText: 'Password',
                   obscureText: true,
-                  enforceLimit: false, // No character limit on login
+                  enforceLimit: false,
                 ),
-                SizedBox(height: screenHeight * 0.015),
+                SizedBox(height: responsive.spacing(12)),
 
                 // Sign In Button
                 MyButton(text: "Sign In", onTap: signInUser),
-                SizedBox(height: screenHeight * 0.03),
+                SizedBox(height: responsive.spacing(24)),
 
                 // Divider
                 Row(
                   children: [
                     const Expanded(child: Divider(color: Colors.white)),
                     Padding(
-                      padding:
-                          EdgeInsets.symmetric(horizontal: screenWidth * 0.015),
-                      child: Text('Or continue with',
-                          style: TextStyle(
-                              color: Colors.white, fontSize: textSize)),
+                      padding: responsive.padding(horizontal: 12),
+                      child: Text(
+                        'Or continue with',
+                        style: textHelper.bodyMedium(context).copyWith(
+                              color: Colors.white,
+                            ),
+                      ),
                     ),
                     const Expanded(child: Divider(color: Colors.white)),
                   ],
                 ),
-                SizedBox(height: screenHeight * 0.03),
+                SizedBox(height: responsive.spacing(24)),
 
                 // Google Button
                 Row(
@@ -335,7 +310,6 @@ class _LoginPageState extends State<LoginPage> {
                           final userCredential =
                               await AuthService().signInWithGoogle();
                           if (userCredential != null && mounted) {
-                            // Just close the dialog - AuthPage StreamBuilder will handle navigation
                             Navigator.of(context).pop();
                           }
                         } catch (e) {
@@ -363,32 +337,28 @@ class _LoginPageState extends State<LoginPage> {
                     )
                   ],
                 ),
-                SizedBox(height: screenHeight * 0.03),
+                SizedBox(height: responsive.spacing(24)),
 
                 // Don't have an account
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: responsive.spacing(8),
                   children: [
-                    Flexible(
-                      child: Text(
-                        'Don\'t have an account yet?',
-                        style: TextStyle(
-                          color: Colors.grey[700],
-                          fontSize: textSize,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                    Text(
+                      'Don\'t have an account yet?',
+                      style: textHelper.bodyMedium(context).copyWith(
+                            color: Colors.grey[700],
+                          ),
                     ),
-                    SizedBox(width: screenWidth * 0.02),
                     GestureDetector(
                       onTap: widget.onTap,
                       child: Text(
                         'Register',
-                        style: TextStyle(
-                          color: Colors.blue,
-                          fontWeight: FontWeight.bold,
-                          fontSize: textSize,
-                        ),
+                        style: textHelper.bodyMedium(context).copyWith(
+                              color: Colors.blue,
+                              fontWeight: FontWeight.bold,
+                            ),
                       ),
                     ),
                   ],

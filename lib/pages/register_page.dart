@@ -5,8 +5,11 @@ import 'package:rexplore/components/my_button.dart';
 import 'package:rexplore/components/square_tile.dart';
 import 'package:rexplore/firebase_service.dart';
 import 'package:rexplore/services/auth_service.dart';
+import 'package:rexplore/services/email_verification_service.dart';
 import 'package:rexplore/utilities/disposable_email_checker.dart';
 import 'package:rexplore/utilities/email_verification.dart';
+import 'package:rexplore/constants/terms_and_conditions.dart';
+import 'package:rexplore/utilities/responsive_helper.dart';
 
 class RegisterPage extends StatefulWidget {
   final Function()? onTap;
@@ -241,16 +244,34 @@ class _RegisterPageState extends State<RegisterPage> {
         password: password,
       );
 
-      // Send email verification
-      await userCredential.user?.sendEmailVerification();
+      // Verify user was created
+      if (userCredential.user == null) {
+        throw Exception('Failed to create user account');
+      }
 
-      // Add user to Firestore
-      await FirebaseService().addUser(
+      // Send email verification using the service
+      await EmailVerificationService()
+          .sendVerificationEmail(userCredential.user!);
+
+      // Add user to Firestore (pass UID directly to avoid race condition)
+      final success = await FirebaseService().addUser(
         firstName: firstNameController.text.trim(),
         lastName: lastNameController.text.trim(),
         age: userAge,
         email: emailText,
+        uid: userCredential.user!.uid, // Pass UID directly
       );
+
+      if (!success) {
+        throw Exception('Failed to create user profile in database');
+      }
+
+      // Store the registered email and password for resend functionality
+      final String registeredEmail = emailText;
+      final String registeredPassword = password;
+
+      // Sign out the user immediately to prevent login without verification
+      await FirebaseAuth.instance.signOut();
 
       Navigator.of(context).pop(); // Close loading dialog
 
@@ -295,7 +316,7 @@ class _RegisterPageState extends State<RegisterPage> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  emailText,
+                  registeredEmail,
                   style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
@@ -304,7 +325,7 @@ class _RegisterPageState extends State<RegisterPage> {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'Please check your inbox and click the verification link to activate your account.',
+                  'Please check your inbox and click the verification link to activate your account. You must verify your email before you can log in.',
                   style: TextStyle(color: Colors.grey[300], fontSize: 13),
                 ),
                 const SizedBox(height: 12),
@@ -337,9 +358,13 @@ class _RegisterPageState extends State<RegisterPage> {
             actions: [
               TextButton(
                 onPressed: () async {
-                  // Resend verification email
+                  // Resend verification email using the service
                   try {
-                    await userCredential.user?.sendEmailVerification();
+                    await EmailVerificationService().resendVerificationEmail(
+                      email: registeredEmail,
+                      password: registeredPassword,
+                    );
+
                     if (mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
@@ -366,9 +391,13 @@ class _RegisterPageState extends State<RegisterPage> {
               ),
               ElevatedButton(
                 onPressed: () {
-                  Navigator.of(context).pop(); // Close verification dialog
-                  Navigator.of(context).pop(); // Close register dialog
-                  // User will need to verify email before logging in
+                  // Close the verification dialog
+                  Navigator.of(context).pop();
+
+                  // Schedule the page toggle for the next frame to ensure clean state transition
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    widget.onTap?.call();
+                  });
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.green,
@@ -418,58 +447,33 @@ class _RegisterPageState extends State<RegisterPage> {
 
   @override
   Widget build(BuildContext context) {
+    final responsive = context.responsive;
+
     return Dialog(
       backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.all(12), // helps small screens
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          double screenWidth = constraints.maxWidth;
-          double screenHeight = constraints.maxHeight;
-
-          // Clamp values for consistency across devices
-          double titleSize = (screenWidth * 0.08).clamp(20, 32);
-          double textSize = (screenWidth * 0.034).clamp(12, 16);
-
-          return Stack(
-            children: [
-              _cardDialog(screenWidth, screenHeight, titleSize, textSize),
-              Positioned(
-                top: 0,
-                right: screenWidth * 0.04,
-                height: screenHeight * 0.04,
-                width: screenHeight * 0.04,
-                child: OutlinedButton(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                  },
-                  style: OutlinedButton.styleFrom(
-                    padding: EdgeInsets.all(screenHeight * 0.005),
-                    shape: const CircleBorder(),
-                    backgroundColor: Colors.transparent,
-                    side: BorderSide.none,
-                  ),
-                  child: Icon(Icons.cancel, size: screenHeight * 0.035),
-                ),
-              )
-            ],
-          );
-        },
+      insetPadding: responsive.padding(all: 12),
+      child: Stack(
+        children: [
+          _cardDialog(context),
+        ],
       ),
     );
   }
 
-  Widget _cardDialog(double screenWidth, double screenHeight, double titleSize,
-      double textSize) {
+  Widget _cardDialog(BuildContext context) {
+    final responsive = context.responsive;
+    final textHelper = ResponsiveText(responsive);
+
     return Container(
-      constraints: const BoxConstraints(maxWidth: 500), // prevents stretching
-      padding: EdgeInsets.symmetric(
-        vertical: screenHeight * 0.02,
-        horizontal: screenWidth * 0.06,
+      constraints: const BoxConstraints(maxWidth: 500),
+      padding: responsive.padding(
+        vertical: 16,
+        horizontal: 20,
       ),
-      margin: EdgeInsets.all(screenWidth * 0.04),
+      margin: responsive.padding(all: 16),
       decoration: BoxDecoration(
         color: const Color(0xff2A303E),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(responsive.borderRadius(12)),
       ),
       child: SafeArea(
         child: Center(
@@ -479,25 +483,24 @@ class _RegisterPageState extends State<RegisterPage> {
               children: [
                 Text(
                   'Sign Up',
-                  style: TextStyle(
-                    fontSize: titleSize,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
+                  style: textHelper.headlineLarge(context).copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
                 ),
-                SizedBox(height: screenHeight * 0.03),
+                SizedBox(height: responsive.spacing(24)),
                 MyTextfield(
                   controller: lastNameController,
                   hintText: 'Last Name',
                   obscureText: false,
                 ),
-                SizedBox(height: screenHeight * 0.015),
+                SizedBox(height: responsive.spacing(12)),
                 MyTextfield(
                   controller: firstNameController,
                   hintText: 'First Name',
                   obscureText: false,
                 ),
-                SizedBox(height: screenHeight * 0.015),
+                SizedBox(height: responsive.spacing(12)),
                 GestureDetector(
                   onTap: () async {
                     DateTime? pickedDate = await showDatePicker(
@@ -523,52 +526,51 @@ class _RegisterPageState extends State<RegisterPage> {
                     ),
                   ),
                 ),
-                SizedBox(height: screenHeight * 0.015),
+                SizedBox(height: responsive.spacing(12)),
                 MyTextfield(
                   controller: emailController,
                   hintText: 'Email',
                   obscureText: false,
                 ),
                 if (emailValidationMessage != null) ...[
-                  SizedBox(height: screenHeight * 0.01),
-                  _buildEmailValidationIndicator(textSize),
+                  SizedBox(height: responsive.spacing(8)),
+                  _buildEmailValidationIndicator(responsive.fontSize(14)),
                 ],
-                SizedBox(height: screenHeight * 0.015),
+                SizedBox(height: responsive.spacing(12)),
                 MyTextfield(
                   controller: passwordController,
                   hintText: 'Password',
                   obscureText: true,
                 ),
                 if (showPasswordRequirements) ...[
-                  SizedBox(height: screenHeight * 0.01),
-                  _buildPasswordRequirements(textSize),
+                  SizedBox(height: responsive.spacing(8)),
+                  _buildPasswordRequirements(responsive.fontSize(14)),
                 ],
-                SizedBox(height: screenHeight * 0.015),
+                SizedBox(height: responsive.spacing(12)),
                 MyTextfield(
                   controller: confirmPasswordController,
                   hintText: 'Confirm Password',
                   obscureText: true,
                 ),
                 if (confirmPasswordController.text.isNotEmpty) ...[
-                  SizedBox(height: screenHeight * 0.01),
-                  _buildPasswordMatchIndicator(textSize),
+                  SizedBox(height: responsive.spacing(8)),
+                  _buildPasswordMatchIndicator(responsive.fontSize(14)),
                 ],
-                SizedBox(height: screenHeight * 0.015),
-                _buildTermsAndConditions(textSize),
-                SizedBox(height: screenHeight * 0.015),
+                SizedBox(height: responsive.spacing(12)),
+                _buildTermsAndConditions(responsive.fontSize(14)),
+                SizedBox(height: responsive.spacing(12)),
                 MyButton(
                   text: "Create Account",
                   onTap: createAccount,
                 ),
-                SizedBox(height: screenHeight * 0.03),
+                SizedBox(height: responsive.spacing(24)),
                 Row(
                   children: [
                     const Expanded(
                       child: Divider(thickness: 1, color: Colors.white),
                     ),
                     Padding(
-                      padding:
-                          EdgeInsets.symmetric(horizontal: screenWidth * 0.015),
+                      padding: responsive.padding(horizontal: 12),
                       child: const Text('Or continue with',
                           style: TextStyle(color: Colors.white)),
                     ),
@@ -577,7 +579,7 @@ class _RegisterPageState extends State<RegisterPage> {
                     ),
                   ],
                 ),
-                SizedBox(height: screenHeight * 0.03),
+                SizedBox(height: responsive.spacing(24)),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -615,7 +617,7 @@ class _RegisterPageState extends State<RegisterPage> {
                     ),
                   ],
                 ),
-                SizedBox(height: screenHeight * 0.03),
+                SizedBox(height: responsive.spacing(24)),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -624,12 +626,12 @@ class _RegisterPageState extends State<RegisterPage> {
                         'Already have an account?',
                         style: TextStyle(
                           color: Colors.grey[700],
-                          fontSize: textSize,
+                          fontSize: responsive.fontSize(14),
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    SizedBox(width: screenWidth * 0.02),
+                    SizedBox(width: responsive.spacing(8)),
                     GestureDetector(
                       onTap: widget.onTap,
                       child: Text(
@@ -637,7 +639,7 @@ class _RegisterPageState extends State<RegisterPage> {
                         style: TextStyle(
                           color: Colors.blue,
                           fontWeight: FontWeight.bold,
-                          fontSize: textSize,
+                          fontSize: responsive.fontSize(14),
                         ),
                       ),
                     ),
@@ -851,7 +853,7 @@ class _RegisterPageState extends State<RegisterPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Welcome to ReXplore!',
+                  TermsAndConditions.welcomeTitle,
                   style: TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
@@ -860,37 +862,16 @@ class _RegisterPageState extends State<RegisterPage> {
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  'By using this application, you agree to the following terms and conditions:',
+                  TermsAndConditions.welcomeMessage,
                   style: TextStyle(color: Colors.grey[300], fontSize: 14),
                 ),
                 const SizedBox(height: 15),
-                _buildTermItem(
-                  '1. Account Registration',
-                  'You must be at least 16 years old to register. All information provided must be accurate and up-to-date.',
-                ),
-                _buildTermItem(
-                  '2. Privacy',
-                  'We collect and store your personal information securely. Your data will not be shared with third parties without your consent.',
-                ),
-                _buildTermItem(
-                  '3. User Conduct',
-                  'You agree to use this application responsibly and not engage in any activities that may harm other users or the service.',
-                ),
-                _buildTermItem(
-                  '4. Intellectual Property',
-                  'All content and features in this app are owned by ReXplore and protected by intellectual property laws.',
-                ),
-                _buildTermItem(
-                  '5. Limitation of Liability',
-                  'ReXplore is not liable for any damages arising from the use of this application.',
-                ),
-                _buildTermItem(
-                  '6. Changes to Terms',
-                  'We reserve the right to modify these terms at any time. Continued use of the app constitutes acceptance of any changes.',
+                ...TermsAndConditions.terms.map(
+                  (term) => _buildTermItem(term.title, term.description),
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  'Last updated: October 24, 2025',
+                  'Last updated: ${TermsAndConditions.lastUpdated}',
                   style: TextStyle(
                     color: Colors.grey[500],
                     fontSize: 12,

@@ -18,13 +18,12 @@ class AuthPage extends StatelessWidget {
             ),
           );
         }
-        // If user is logged in, show HomePage
-        if (snapshot.hasData) {
+
+        // If user is logged in AND email is verified, show HomePage
+        if (snapshot.hasData && snapshot.data!.emailVerified) {
           return const HomePage();
-        } else {
-          // If not logged in, show LandingPage
-          return const LandingPage();
         }
+        return const LandingPage();
       },
     );
   }

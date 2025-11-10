@@ -34,12 +34,25 @@ android {
             signingConfig = signingConfigs.debug
             // Enable ProGuard rules to keep WebView classes
             minifyEnabled true
+            shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
         debug {
             // Disable minification in debug for faster builds
             minifyEnabled false
         }
+    }
+    
+    // Add packaging options to handle duplicate files
+    packagingOptions {
+        exclude 'META-INF/DEPENDENCIES'
+        exclude 'META-INF/LICENSE'
+        exclude 'META-INF/LICENSE.txt'
+        exclude 'META-INF/license.txt'
+        exclude 'META-INF/NOTICE'
+        exclude 'META-INF/NOTICE.txt'
+        exclude 'META-INF/notice.txt'
+        exclude 'META-INF/*.kotlin_module'
     }
 }
 

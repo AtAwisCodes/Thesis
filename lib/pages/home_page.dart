@@ -15,6 +15,7 @@ import 'package:rexplore/pages/search_bar.dart';
 import 'package:rexplore/services/ThemeProvider.dart';
 import 'package:rexplore/services/auth_service.dart';
 import 'package:rexplore/viewmodel/yt_videoview_model.dart';
+import 'package:rexplore/utilities/responsive_helper.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -90,6 +91,8 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final responsive = context.responsive;
+    final textHelper = ResponsiveText(responsive);
 
     return Scaffold(
       extendBody: true,
@@ -99,16 +102,21 @@ class _HomePageState extends State<HomePage> {
         automaticallyImplyLeading: false,
         elevation: 0,
         backgroundColor: Colors.transparent,
+        toolbarHeight: responsive.appBarHeight,
         title: Text(
           getAppBarTitle(page),
-          style:
-              theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+          style: textHelper.titleLarge(context).copyWith(
+                fontWeight: FontWeight.bold,
+              ),
         ),
         centerTitle: false,
         leading: page == 4
             ? Builder(
                 builder: (context) => IconButton(
-                  icon: const Icon(Icons.menu),
+                  icon: Icon(
+                    Icons.menu,
+                    size: responsive.iconSize(24),
+                  ),
                   onPressed: () => Scaffold.of(context).openDrawer(),
                 ),
               )
@@ -116,7 +124,10 @@ class _HomePageState extends State<HomePage> {
         actions: [
           if (page == 0)
             IconButton(
-              icon: const Icon(Icons.search),
+              icon: Icon(
+                Icons.search,
+                size: responsive.iconSize(24),
+              ),
               onPressed: () {
                 showSearch(context: context, delegate: MySearchDelegate());
               },
@@ -258,7 +269,7 @@ class _HomePageState extends State<HomePage> {
       //Camera Floating Action Button AI - Only visible on home page
       floatingActionButton: page == 0
           ? Padding(
-              padding: const EdgeInsets.only(bottom: 0),
+              padding: EdgeInsets.only(bottom: responsive.spacing(0)),
               child: FloatingActionButton(
                 onPressed: () async {
                   final cameras = await availableCameras();
@@ -277,10 +288,10 @@ class _HomePageState extends State<HomePage> {
                 },
                 backgroundColor: theme.colorScheme.primary,
                 elevation: 6,
-                child: const Icon(
+                child: Icon(
                   Icons.camera_alt_rounded,
                   color: Colors.white,
-                  size: 28,
+                  size: responsive.iconSize(28),
                 ),
               ),
             )
@@ -288,12 +299,12 @@ class _HomePageState extends State<HomePage> {
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
 
       bottomNavigationBar: Padding(
-        padding: const EdgeInsets.only(bottom: 0),
+        padding: EdgeInsets.only(bottom: responsive.spacing(0)),
         child: Container(
           decoration: BoxDecoration(
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(25),
-              topRight: Radius.circular(25),
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(responsive.borderRadius(25)),
+              topRight: Radius.circular(responsive.borderRadius(25)),
             ),
             boxShadow: [
               BoxShadow(
@@ -304,14 +315,14 @@ class _HomePageState extends State<HomePage> {
             ],
           ),
           child: ClipRRect(
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(25),
-              topRight: Radius.circular(25),
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(responsive.borderRadius(25)),
+              topRight: Radius.circular(responsive.borderRadius(25)),
             ),
             child: BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 0, sigmaY: 0),
               child: SizedBox(
-                height: 100,
+                height: responsive.bottomNavHeight,
                 child: StreamBuilder<DocumentSnapshot>(
                   stream: currentUser != null
                       ? FirebaseFirestore.instance
@@ -333,14 +344,16 @@ class _HomePageState extends State<HomePage> {
                       Icon(
                         page == 0 ? Icons.home : Icons.home_outlined,
                         color: theme.iconTheme.color,
+                        size: responsive.iconSize(24),
                       ),
                       Icon(
                         page == 1 ? Icons.favorite : Icons.favorite_border,
                         color: theme.iconTheme.color,
+                        size: responsive.iconSize(24),
                       ),
                       Icon(
                         page == 2 ? Icons.add_circle : Icons.add_circle_outline,
-                        size: 30,
+                        size: responsive.iconSize(30),
                         color: theme.iconTheme.color,
                       ),
                       Icon(
@@ -348,14 +361,15 @@ class _HomePageState extends State<HomePage> {
                             ? Icons.notifications
                             : Icons.notifications_none,
                         color: theme.iconTheme.color,
+                        size: responsive.iconSize(24),
                       ),
                       CircleAvatar(
-                        radius: 18,
+                        radius: responsive.iconSize(18),
                         backgroundColor: page == 4
                             ? theme.colorScheme.primary
                             : Colors.grey.shade200,
                         child: CircleAvatar(
-                          radius: 16,
+                          radius: responsive.iconSize(16),
                           backgroundImage: avatarUrl != null
                               ? NetworkImage(
                                   "$avatarUrl?t=${DateTime.now().millisecondsSinceEpoch}")

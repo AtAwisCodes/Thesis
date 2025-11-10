@@ -13,11 +13,10 @@ class _LandingPage extends State<LandingPage> {
   int _currentIndex = 0;
 
   final List<String> _imagePaths = [
-    'lib/icons/Google.png',
+    //Add dalawang images
     'lib/icons/Landing.png',
     'lib/icons/LandPic.png',
     'lib/icons/Loading.gif',
-    'lib/icons/ReXplore.png',
   ];
 
   @override
