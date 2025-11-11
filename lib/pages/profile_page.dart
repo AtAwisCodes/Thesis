@@ -386,6 +386,8 @@ class _ProfilePageState extends State<ProfilePage> {
                           ),
                           title: Text(
                             '${follower['firstName']} ${follower['lastName']}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         );
                       },
@@ -478,6 +480,8 @@ class _ProfilePageState extends State<ProfilePage> {
                           ),
                           title: Text(
                             '${user['firstName']} ${user['lastName']}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         );
                       },
@@ -609,6 +613,8 @@ class _ProfilePageState extends State<ProfilePage> {
                                               .copyWith(
                                             fontWeight: FontWeight.bold,
                                           ),
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
                                         ),
                                       ),
                                       IconButton(
@@ -621,6 +627,8 @@ class _ProfilePageState extends State<ProfilePage> {
                                     email,
                                     style: theme.textTheme.bodySmall!
                                         .copyWith(color: Colors.grey),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                   const SizedBox(height: 8),
                                   AnimatedSwitcher(
@@ -629,6 +637,8 @@ class _ProfilePageState extends State<ProfilePage> {
                                       bio,
                                       key: ValueKey(bio),
                                       style: theme.textTheme.bodyMedium,
+                                      maxLines: 3,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
                                 ],
@@ -1248,6 +1258,8 @@ class FullVideoPlayerPage extends StatelessWidget {
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                     ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   if (description.isNotEmpty) ...[
                     const SizedBox(height: 12),
@@ -1257,6 +1269,8 @@ class FullVideoPlayerPage extends StatelessWidget {
                         fontSize: 14,
                         color: Colors.grey[600],
                       ),
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ],

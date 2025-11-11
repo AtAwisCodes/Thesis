@@ -5,6 +5,7 @@ import 'package:rexplore/admin/widgets/report_card.dart';
 import 'package:rexplore/admin/widgets/stats_card.dart';
 import 'package:rexplore/admin/report_detail_page.dart';
 import 'package:rexplore/admin/user_management_page.dart';
+import 'package:rexplore/admin/system_reports_page.dart';
 
 class AdminDashboardPage extends StatefulWidget {
   const AdminDashboardPage({super.key});
@@ -148,6 +149,18 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         foregroundColor: Colors.black87,
         elevation: 0,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.bug_report),
+            tooltip: 'System Reports',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const SystemReportsPage(),
+                ),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.people),
             tooltip: 'User Management',

@@ -44,6 +44,8 @@ class _CategorySelectorWidgetState extends State<CategorySelectorWidget> {
             fontSize: 12,
             color: Colors.grey,
           ),
+          maxLines: 3,
+          overflow: TextOverflow.ellipsis,
         ),
         const SizedBox(height: 16),
         Wrap(
@@ -98,6 +100,8 @@ class _CategorySelectorWidgetState extends State<CategorySelectorWidget> {
                       fontSize: 12,
                       color: Colors.green.shade700,
                     ),
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],

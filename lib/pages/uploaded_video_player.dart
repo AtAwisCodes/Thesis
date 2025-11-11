@@ -1710,6 +1710,8 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
                             fontWeight: FontWeight.bold,
                           ),
                           textAlign: TextAlign.left,
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),

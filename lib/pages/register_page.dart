@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:rexplore/components/my_textfield.dart';
 import 'package:rexplore/components/my_button.dart';
 import 'package:rexplore/components/square_tile.dart';
+import 'package:rexplore/components/error_notification.dart';
 import 'package:rexplore/firebase_service.dart';
 import 'package:rexplore/services/auth_service.dart';
 import 'package:rexplore/services/email_verification_service.dart';
@@ -150,21 +151,23 @@ class _RegisterPageState extends State<RegisterPage> {
 
     // Validate email is not empty
     if (emailText.isEmpty) {
-      showErrorMessage("Please enter an email address.");
+      ErrorNotification.show(context, "Please enter an email address");
       return;
     }
 
     // Validate email format
     if (!EmailVerification.isValidEmailFormat(emailText)) {
-      showErrorMessage("Please enter a valid email address.");
+      ErrorNotification.show(context, "Please enter a valid email address");
       return;
     }
 
     // Check for disposable email
     final isDisposable = await DisposableEmailChecker.isDisposable(emailText);
     if (isDisposable) {
-      showErrorMessage(
-          "Disposable email addresses are not allowed.\nPlease use a permanent email address.");
+      ErrorNotification.show(
+        context,
+        "Disposable email addresses are not allowed.\nPlease use a permanent email address.",
+      );
       return;
     }
 
@@ -172,12 +175,15 @@ class _RegisterPageState extends State<RegisterPage> {
     try {
       final isAvailable = await EmailVerification.isEmailAvailable(emailText);
       if (!isAvailable) {
-        showErrorMessage(
-            "This email is already registered.\nPlease use a different email or try logging in.");
+        ErrorNotification.show(
+          context,
+          "This email is already registered.\nPlease use a different email or try logging in.",
+        );
         return;
       }
     } catch (e) {
-      showErrorMessage("Error verifying email: ${e.toString()}");
+      ErrorNotification.show(
+          context, "Error verifying email. Please try again");
       return;
     }
 
@@ -191,11 +197,11 @@ class _RegisterPageState extends State<RegisterPage> {
         int year = int.parse(parts[2]);
         dob = DateTime(year, month, day);
       } else {
-        showErrorMessage("Invalid date of birth format.");
+        ErrorNotification.show(context, "Invalid date of birth format");
         return;
       }
     } catch (e) {
-      showErrorMessage("Invalid date of birth.");
+      ErrorNotification.show(context, "Invalid date of birth");
       return;
     }
 
@@ -203,8 +209,9 @@ class _RegisterPageState extends State<RegisterPage> {
 
     // Age restriction check
     if (userAge < 16) {
-      showErrorMessage(
-        "You must be at least 16 years old to register.\nParental guidance is required.",
+      ErrorNotification.show(
+        context,
+        "You must be at least 16 years old to register",
       );
       return;
     }
@@ -215,19 +222,20 @@ class _RegisterPageState extends State<RegisterPage> {
         !hasLowercase ||
         !hasNumber ||
         !hasSpecialChar) {
-      showErrorMessage("Meet all password requirements.");
+      ErrorNotification.show(context, "Please meet all password requirements");
       return;
     }
 
     // Confirm password match
     if (password != confirmPassword) {
-      showErrorMessage("Passwords do not match.");
+      ErrorNotification.show(context, "Passwords do not match");
       return;
     }
 
     // Check if terms and conditions are accepted
     if (!acceptedTerms) {
-      showErrorMessage("Accept the Terms and Conditions to continue.");
+      ErrorNotification.show(
+          context, "Please accept the Terms and Conditions to continue");
       return;
     }
 
@@ -413,7 +421,7 @@ class _RegisterPageState extends State<RegisterPage> {
       }
     } catch (e) {
       Navigator.of(context).pop();
-      showErrorMessage("Registration failed: ${e.toString()}");
+      ErrorNotification.show(context, "Registration failed. Please try again");
     }
   }
 
@@ -425,24 +433,6 @@ class _RegisterPageState extends State<RegisterPage> {
       age--;
     }
     return age;
-  }
-
-  void showErrorMessage(String message) {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          backgroundColor: Colors.deepPurple,
-          title: Center(
-            child: Text(
-              message,
-              style: const TextStyle(color: Colors.white),
-              textAlign: TextAlign.center,
-            ),
-          ),
-        );
-      },
-    );
   }
 
   @override
@@ -487,6 +477,9 @@ class _RegisterPageState extends State<RegisterPage> {
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
                       ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
                 ),
                 SizedBox(height: responsive.spacing(24)),
                 MyTextfield(
@@ -594,21 +587,9 @@ class _RegisterPageState extends State<RegisterPage> {
                           }
                         } catch (e) {
                           if (mounted) {
-                            showDialog(
-                              context: context,
-                              builder: (context) => AlertDialog(
-                                backgroundColor: Colors.deepPurple,
-                                title: const Center(
-                                  child: Text(
-                                    'Google sign-in failed',
-                                    style: TextStyle(color: Colors.white),
-                                  ),
-                                ),
-                                content: Text(
-                                  e.toString(),
-                                  style: const TextStyle(color: Colors.white),
-                                ),
-                              ),
+                            ErrorNotification.show(
+                              context,
+                              'Unable to sign in with Google. Please try again.',
                             );
                           }
                         }

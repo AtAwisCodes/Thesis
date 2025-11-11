@@ -507,6 +507,8 @@ class _YtVideoPlayerState extends State<YtVideoPlayer> {
                   fontWeight: FontWeight.bold,
                   fontSize: 16,
                 ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
               const SizedBox(height: 4),
               Text(
@@ -519,6 +521,8 @@ class _YtVideoPlayerState extends State<YtVideoPlayer> {
                       ?.color
                       ?.withOpacity(0.7),
                 ),
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),
@@ -558,6 +562,8 @@ class _YtVideoPlayerState extends State<YtVideoPlayer> {
             color:
                 Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.7),
           ),
+          maxLines: 5,
+          overflow: TextOverflow.ellipsis,
         ),
       ],
     );
@@ -584,6 +590,8 @@ class _YtVideoPlayerState extends State<YtVideoPlayer> {
                   fontWeight: FontWeight.bold,
                   fontSize: 14,
                 ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
               const SizedBox(height: 2),
               Text(
@@ -596,6 +604,8 @@ class _YtVideoPlayerState extends State<YtVideoPlayer> {
                       ?.color
                       ?.withOpacity(0.7),
                 ),
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),
@@ -648,6 +658,8 @@ class _YtVideoPlayerState extends State<YtVideoPlayer> {
                       ?.color
                       ?.withOpacity(0.7),
                 ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),

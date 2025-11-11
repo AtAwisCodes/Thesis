@@ -15,6 +15,7 @@ import 'package:rexplore/services/ThemeProvider.dart';
 import 'package:rexplore/services/auth_service.dart';
 import 'package:rexplore/viewmodel/yt_videoview_model.dart';
 import 'package:rexplore/utilities/responsive_helper.dart';
+import 'package:rexplore/components/system_report_dialog.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -42,7 +43,7 @@ class _HomePageState extends State<HomePage> {
             children: [
               Icon(Icons.logout, color: Colors.orange),
               SizedBox(width: 8),
-              Text('Logout Confirmation'),
+              Text('Logging Out!'),
             ],
           ),
           content: const Text(
@@ -147,9 +148,9 @@ class _HomePageState extends State<HomePage> {
                         as Map<String, dynamic>)["avatar_url"];
                   }
 
-                  return ListView(
-                    padding: EdgeInsets.zero,
+                  return Column(
                     children: [
+                      // Header
                       Container(
                         decoration: const BoxDecoration(
                           gradient: LinearGradient(
@@ -164,8 +165,14 @@ class _HomePageState extends State<HomePage> {
                           accountName: Text(
                             currentUser?.displayName ?? "User",
                             style: const TextStyle(fontWeight: FontWeight.bold),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          accountEmail: Text(currentUser?.email ?? ""),
+                          accountEmail: Text(
+                            currentUser?.email ?? "",
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                           currentAccountPicture: CircleAvatar(
                             radius: 30,
                             backgroundColor: Colors.transparent,
@@ -176,23 +183,69 @@ class _HomePageState extends State<HomePage> {
                           ),
                         ),
                       ),
-                      SwitchListTile(
-                        title: const Text("Theme Mode"),
-                        value: Provider.of<ThemeProvider>(context).isDarkMode,
-                        onChanged: (val) {
-                          Provider.of<ThemeProvider>(context, listen: false)
-                              .toggleTheme(val);
-                        },
-                        secondary: const Icon(Icons.brightness_6),
+
+                      // Menu Items
+                      Expanded(
+                        child: ListView(
+                          padding: EdgeInsets.zero,
+                          children: [
+                            SwitchListTile(
+                              title: const Text("Theme Mode"),
+                              subtitle: const Text("Dark/Light Mode"),
+                              value: Provider.of<ThemeProvider>(context)
+                                  .isDarkMode,
+                              onChanged: (val) {
+                                Provider.of<ThemeProvider>(context,
+                                        listen: false)
+                                    .toggleTheme(val);
+                              },
+                              secondary: const Icon(Icons.brightness_6),
+                            ),
+                            const Divider(),
+                            ListTile(
+                              leading: const Icon(Icons.feedback),
+                              title: const Text('Report System Issue'),
+                              subtitle: const Text('Help us improve'),
+                              onTap: () {
+                                Navigator.pop(context); // Close drawer
+                                showDialog(
+                                  context: context,
+                                  builder: (context) =>
+                                      const SystemReportDialog(),
+                                );
+                              },
+                            ),
+                            ListTile(
+                              leading: const Icon(Icons.info_outline),
+                              title: const Text('About Us'),
+                              subtitle: const Text('Learn more about ReXplore'),
+                              onTap: () {
+                                // TODO: Add About Us page navigation
+                                Navigator.pop(context);
+                              },
+                            ),
+                          ],
+                        ),
                       ),
-                      const ListTile(
-                        leading: Icon(Icons.info_outline),
-                        title: Text('About Us'),
-                      ),
-                      ListTile(
-                        leading: const Icon(Icons.logout),
-                        title: const Text('Logout'),
-                        onTap: signUserOut,
+
+                      // Logout Button at Bottom
+                      const Divider(height: 1),
+                      Container(
+                        color: Colors.red.withOpacity(0.1),
+                        child: ListTile(
+                          leading: const Icon(
+                            Icons.logout,
+                            color: Colors.red,
+                          ),
+                          title: const Text(
+                            'Logout',
+                            style: TextStyle(
+                              color: Colors.red,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          onTap: signUserOut,
+                        ),
                       ),
                     ],
                   );

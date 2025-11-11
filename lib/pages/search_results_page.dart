@@ -39,6 +39,8 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
                 fontSize: 18,
                 fontWeight: FontWeight.w500,
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             );
           },
         ),
@@ -134,6 +136,8 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
                             color: Colors.grey[700],
                           ),
                           textAlign: TextAlign.center,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 8),
                         Text(
@@ -143,6 +147,8 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
                             color: Colors.grey[500],
                           ),
                           textAlign: TextAlign.center,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 24),
                         ElevatedButton.icon(
@@ -188,6 +194,8 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
                         fontWeight: FontWeight.w500,
                         color: Colors.green[800],
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   // Results list

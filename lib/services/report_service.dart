@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
 
 enum ReportReason {
   inappropriate,
@@ -8,6 +9,13 @@ enum ReportReason {
   copyright,
   violence,
   hateSpeech,
+  other,
+}
+
+enum SystemReportCategory {
+  performance,
+  technicalIssue,
+  featureRequest,
   other,
 }
 
@@ -39,6 +47,45 @@ extension ReportReasonExtension on ReportReason {
     return ReportReason.values.firstWhere(
       (e) => e.value == value,
       orElse: () => ReportReason.other,
+    );
+  }
+}
+
+extension SystemReportCategoryExtension on SystemReportCategory {
+  String get displayName {
+    switch (this) {
+      case SystemReportCategory.performance:
+        return 'Performance Issues';
+      case SystemReportCategory.technicalIssue:
+        return 'Technical Issues';
+      case SystemReportCategory.featureRequest:
+        return 'Feature Request';
+      case SystemReportCategory.other:
+        return 'Other';
+    }
+  }
+
+  String get value {
+    return toString().split('.').last;
+  }
+
+  IconData get icon {
+    switch (this) {
+      case SystemReportCategory.performance:
+        return Icons.speed;
+      case SystemReportCategory.technicalIssue:
+        return Icons.bug_report;
+      case SystemReportCategory.featureRequest:
+        return Icons.lightbulb_outline;
+      case SystemReportCategory.other:
+        return Icons.help_outline;
+    }
+  }
+
+  static SystemReportCategory fromString(String value) {
+    return SystemReportCategory.values.firstWhere(
+      (e) => e.value == value,
+      orElse: () => SystemReportCategory.other,
     );
   }
 }
@@ -287,6 +334,110 @@ class ReportService {
       return true;
     } catch (e) {
       print('Error dismissing report: $e');
+      return false;
+    }
+  }
+
+  /// Report a system issue (maintenance, performance, technical)
+  Future<bool> reportSystemIssue({
+    required SystemReportCategory category,
+    required String title,
+    required String description,
+  }) async {
+    try {
+      final currentUser = _auth.currentUser;
+      if (currentUser == null) {
+        print('User not logged in');
+        return false;
+      }
+
+      // Get reporter info
+      final reporterDoc =
+          await _firestore.collection('count').doc(currentUser.uid).get();
+
+      String reporterName = 'Anonymous';
+      String reporterEmail = currentUser.email ?? '';
+
+      if (reporterDoc.exists) {
+        final data = reporterDoc.data()!;
+        reporterName =
+            '${data['first_name'] ?? ''} ${data['last_name'] ?? ''}'.trim();
+        if (reporterName.isEmpty) reporterName = 'Anonymous';
+      }
+
+      // Create system report
+      final reportData = {
+        'reporterId': currentUser.uid,
+        'reporterName': reporterName,
+        'reporterEmail': reporterEmail,
+        'category': category.value,
+        'categoryDisplay': category.displayName,
+        'title': title,
+        'description': description,
+        'status': 'pending', // pending, reviewing, resolved, dismissed
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+        'adminNotes': '',
+        'resolvedAt': null,
+        'resolvedBy': null,
+      };
+
+      await _firestore.collection('system_reports').add(reportData);
+      print('System issue reported successfully');
+      return true;
+    } catch (e) {
+      print('Error reporting system issue: $e');
+      return false;
+    }
+  }
+
+  /// Stream system reports for admin dashboard
+  Stream<List<Map<String, dynamic>>> streamSystemReports({String? status}) {
+    Query query = _firestore
+        .collection('system_reports')
+        .orderBy('createdAt', descending: true);
+
+    if (status != null) {
+      query = query.where('status', isEqualTo: status);
+    }
+
+    return query.snapshots().map((snapshot) {
+      return snapshot.docs.map((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        data['id'] = doc.id;
+        return data;
+      }).toList();
+    });
+  }
+
+  /// Admin: Update system report status
+  Future<bool> updateSystemReportStatus({
+    required String reportId,
+    required String status,
+    String? adminNotes,
+  }) async {
+    try {
+      final updateData = {
+        'status': status,
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+
+      if (adminNotes != null) {
+        updateData['adminNotes'] = adminNotes;
+      }
+
+      if (status == 'resolved') {
+        updateData['resolvedAt'] = FieldValue.serverTimestamp();
+        updateData['resolvedBy'] = _auth.currentUser?.email ?? 'admin';
+      }
+
+      await _firestore
+          .collection('system_reports')
+          .doc(reportId)
+          .update(updateData);
+      return true;
+    } catch (e) {
+      print('Error updating system report status: $e');
       return false;
     }
   }

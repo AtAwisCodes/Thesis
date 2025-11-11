@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:rexplore/components/my_button.dart';
 import 'package:rexplore/components/my_textfield.dart';
 import 'package:rexplore/components/square_tile.dart';
+import 'package:rexplore/components/error_notification.dart';
 import 'package:rexplore/services/auth_service.dart';
 import 'package:rexplore/utilities/disposable_email_checker.dart';
 import 'package:rexplore/utilities/responsive_helper.dart';
@@ -20,17 +21,26 @@ class _LoginPageState extends State<LoginPage> {
   final passwordController = TextEditingController();
 
   void signInUser() async {
-    // Check for disposable email
+    // Check for empty email
     final emailText = emailController.text.trim();
     if (emailText.isEmpty) {
-      showErrorMessage("Please enter an email address");
+      ErrorNotification.show(context, "Please enter your email address");
       return;
     }
 
+    // Check for empty password
+    if (passwordController.text.trim().isEmpty) {
+      ErrorNotification.show(context, "Please enter your password");
+      return;
+    }
+
+    // Check for disposable email
     final isDisposable = await DisposableEmailChecker.isDisposable(emailText);
     if (isDisposable) {
-      showErrorMessage(
-          "Disposable email addresses are not allowed. Please use a permanent email address.");
+      ErrorNotification.show(
+        context,
+        "Disposable email addresses are not allowed.\nPlease use a permanent email address.",
+      );
       return;
     }
 
@@ -59,7 +69,7 @@ class _LoginPageState extends State<LoginPage> {
         } catch (e) {
           // Account is deleted, show error
           if (mounted) {
-            showErrorMessage(e.toString());
+            ErrorNotification.show(context, e.toString());
           }
           return;
         }
@@ -69,9 +79,35 @@ class _LoginPageState extends State<LoginPage> {
       if (mounted) {
         Navigator.of(context).pop();
       }
-    } on FirebaseAuthException {
+    } on FirebaseAuthException catch (e) {
       if (mounted) {
-        showErrorMessage("Some information not matched in our system");
+        String errorMessage;
+
+        // Provide user-friendly error messages
+        switch (e.code) {
+          case 'user-not-found':
+            errorMessage = "No account found with this email";
+            break;
+          case 'wrong-password':
+            errorMessage = "Incorrect password";
+            break;
+          case 'invalid-email':
+            errorMessage = "Invalid email address";
+            break;
+          case 'user-disabled':
+            errorMessage = "This account has been disabled";
+            break;
+          case 'too-many-requests':
+            errorMessage = "Too many failed attempts. Please try again later";
+            break;
+          case 'invalid-credential':
+            errorMessage = "Invalid email or password";
+            break;
+          default:
+            errorMessage = "Invalid email or password";
+        }
+
+        ErrorNotification.show(context, errorMessage);
       }
     }
   }
@@ -193,21 +229,6 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  void showErrorMessage(String message) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: Colors.deepPurple,
-        title: Center(
-          child: Text(
-            message,
-            style: const TextStyle(color: Colors.white),
-          ),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final responsive = context.responsive;
@@ -250,6 +271,9 @@ class _LoginPageState extends State<LoginPage> {
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
                       ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
                 ),
                 SizedBox(height: responsive.spacing(8)),
                 Text(
@@ -257,6 +281,9 @@ class _LoginPageState extends State<LoginPage> {
                   style: textHelper.bodyLarge(context).copyWith(
                         color: Colors.white,
                       ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
                 ),
                 SizedBox(height: responsive.spacing(24)),
 
@@ -314,21 +341,9 @@ class _LoginPageState extends State<LoginPage> {
                           }
                         } catch (e) {
                           if (mounted) {
-                            showDialog(
-                              context: context,
-                              builder: (context) => AlertDialog(
-                                backgroundColor: Colors.deepPurple,
-                                title: const Center(
-                                  child: Text(
-                                    'Google sign-in failed',
-                                    style: TextStyle(color: Colors.white),
-                                  ),
-                                ),
-                                content: Text(
-                                  e.toString(),
-                                  style: const TextStyle(color: Colors.white),
-                                ),
-                              ),
+                            ErrorNotification.show(
+                              context,
+                              'Unable to sign in with Google. Please try again.',
                             );
                           }
                         }

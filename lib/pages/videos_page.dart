@@ -140,7 +140,13 @@ class _VideosPageState extends State<VideosPage> {
         children: [
           Icon(icon, size: 16, color: isSelected ? color : Colors.grey),
           const SizedBox(width: 4),
-          Text(label),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
         ],
       ),
       selected: isSelected,

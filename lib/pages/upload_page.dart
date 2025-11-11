@@ -99,14 +99,21 @@ class _UploadPage extends State<UploadPage> {
                         fontWeight: FontWeight.bold,
                       ),
                       textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 16),
-                    Text(
-                      'Select a video from your gallery or record a new one using the camera',
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                        color: Colors.grey[600],
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                      child: Text(
+                        'Select a video from your gallery or record a new one using the camera',
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                          color: Colors.grey[600],
+                        ),
+                        textAlign: TextAlign.center,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 40),
                     ElevatedButton.icon(
