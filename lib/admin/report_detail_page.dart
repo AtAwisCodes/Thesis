@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import 'package:video_player/video_player.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:rexplore/admin/user_management_page.dart';
 
 class ReportDetailPage extends StatefulWidget {
   final String reportId;
@@ -571,8 +572,34 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                       valueColor: _getStatusColor(status)),
                   _buildInfoRow('Reason', _formatReason(reason)),
                   _buildInfoRow('Video Title', videoTitle),
-                  _buildInfoRow('Reported By', reporterEmail),
-                  _buildInfoRow('Uploader', uploaderEmail),
+                  _buildClickableInfoRow(
+                    'Reported By',
+                    reporterEmail,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => UserManagementPage(
+                            initialSearchQuery: reporterEmail,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  _buildClickableInfoRow(
+                    'Uploader',
+                    uploaderEmail,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => UserManagementPage(
+                            initialSearchQuery: uploaderEmail,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
                   _buildInfoRow('Date Reported', formattedDate),
                   if (description.isNotEmpty) ...[
                     const SizedBox(height: 16),
@@ -832,6 +859,54 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
     );
   }
 
+  Widget _buildClickableInfoRow(String label, String value,
+      {required VoidCallback onTap}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 140,
+            child: Text(
+              '$label:',
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: Colors.black54,
+              ),
+            ),
+          ),
+          Expanded(
+            child: MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: GestureDetector(
+                onTap: onTap,
+                child: Row(
+                  children: [
+                    Flexible(
+                      child: _HoverableText(
+                        text: value,
+                        normalColor: Colors.black87,
+                        hoverColor: Colors.blue,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    const Icon(
+                      Icons.arrow_forward,
+                      size: 16,
+                      color: Colors.blue,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
       case 'pending':
@@ -845,5 +920,41 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
       default:
         return Colors.grey;
     }
+  }
+}
+
+/// Hoverable text widget that changes color on hover
+class _HoverableText extends StatefulWidget {
+  final String text;
+  final Color normalColor;
+  final Color hoverColor;
+
+  const _HoverableText({
+    required this.text,
+    required this.normalColor,
+    required this.hoverColor,
+  });
+
+  @override
+  State<_HoverableText> createState() => _HoverableTextState();
+}
+
+class _HoverableTextState extends State<_HoverableText> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: Text(
+        widget.text,
+        style: TextStyle(
+          fontSize: 14,
+          color: _isHovered ? widget.hoverColor : widget.normalColor,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+    );
   }
 }

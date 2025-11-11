@@ -18,7 +18,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   String _currentFilter = 'all';
-  String _viewMode = 'list';
 
   Map<String, int> _stats = {
     'pending': 0,
@@ -109,67 +108,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     }).toList();
   }
 
-  /// Group reports by videoId and count how many times each video was reported
-  Map<String, List<QueryDocumentSnapshot>> _groupReportsByVideo(
-      List<QueryDocumentSnapshot> reports) {
-    final grouped = <String, List<QueryDocumentSnapshot>>{};
-
-    for (var report in reports) {
-      final data = report.data() as Map<String, dynamic>;
-      final videoId = data['videoId'] as String? ?? '';
-
-      if (videoId.isNotEmpty) {
-        grouped.putIfAbsent(videoId, () => []);
-        grouped[videoId]!.add(report);
-      }
-    }
-
-    // Sort by number of reports (most reported first)
-    final sortedEntries = grouped.entries.toList()
-      ..sort((a, b) => b.value.length.compareTo(a.value.length));
-
-    return Map.fromEntries(sortedEntries);
-  }
-
-  /// Delete all YouTube video reports from the database (one-time cleanup)
-  Future<void> _deleteYouTubeReports() async {
-    try {
-      final allReports = await _firestore.collection('video_reports').get();
-
-      int deletedCount = 0;
-
-      for (var doc in allReports.docs) {
-        final data = doc.data();
-        final videoUrl = data['videoUrl'] as String? ?? '';
-
-        // Delete if it's a YouTube video report
-        if (videoUrl.contains('youtube.com') || videoUrl.contains('youtu.be')) {
-          await doc.reference.delete();
-          deletedCount++;
-        }
-      }
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Deleted $deletedCount YouTube video reports'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      print('Error deleting YouTube reports: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
   void _updateStats(List<QueryDocumentSnapshot> docs) {
     final stats = {
       'pending': 0,
@@ -211,46 +149,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         elevation: 0,
         actions: [
           IconButton(
-            icon: const Icon(Icons.delete_sweep),
-            tooltip: 'Delete YouTube Reports (Cleanup)',
-            color: Colors.red[700],
-            onPressed: () async {
-              // Show confirmation dialog
-              final confirmed = await showDialog<bool>(
-                context: context,
-                builder: (context) => AlertDialog(
-                  title: const Row(
-                    children: [
-                      Icon(Icons.warning, color: Colors.orange),
-                      SizedBox(width: 8),
-                      Text('Delete YouTube Reports?'),
-                    ],
-                  ),
-                  content: const Text(
-                    'This will permanently delete all YouTube video reports from the database. User-uploaded video reports will remain. Continue?',
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context, false),
-                      child: const Text('Cancel'),
-                    ),
-                    ElevatedButton(
-                      onPressed: () => Navigator.pop(context, true),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red,
-                      ),
-                      child: const Text('Delete'),
-                    ),
-                  ],
-                ),
-              );
-
-              if (confirmed == true) {
-                await _deleteYouTubeReports();
-              }
-            },
-          ),
-          IconButton(
             icon: const Icon(Icons.people),
             tooltip: 'User Management',
             onPressed: () {
@@ -279,6 +177,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         ],
       ),
       body: StreamBuilder<QuerySnapshot>(
+        key: ValueKey(_currentFilter),
         stream: _getReportsStream(),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
@@ -387,7 +286,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
                 const SizedBox(height: 30),
 
-                // View Mode and Filters in one row
+                // Filter by Status Section
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
@@ -401,78 +300,28 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                       ),
                     ],
                   ),
-                  child: Row(
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // View Mode Section
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'View Mode',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black54,
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            Wrap(
-                              spacing: 12,
-                              runSpacing: 12,
-                              children: [
-                                _buildViewModeChip(
-                                  'All Reports',
-                                  'list',
-                                  Icons.list,
-                                ),
-                                _buildViewModeChip(
-                                  'Group by Video',
-                                  'grouped',
-                                  Icons.video_library,
-                                ),
-                              ],
-                            ),
-                          ],
+                      const Text(
+                        'Filter by Status',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black54,
                         ),
                       ),
-                      const SizedBox(width: 24),
-                      // Divider
-                      Container(
-                        width: 1,
-                        height: 80,
-                        color: Colors.grey[300],
-                      ),
-                      const SizedBox(width: 24),
-                      // Filter by Status Section
-                      Expanded(
-                        flex: 2,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Filter by Status',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black54,
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            Wrap(
-                              spacing: 12,
-                              runSpacing: 12,
-                              children: [
-                                _buildFilterChip('All Reports', 'all'),
-                                _buildFilterChip('Pending', 'pending'),
-                                _buildFilterChip('Reviewing', 'reviewing'),
-                                _buildFilterChip('Resolved', 'resolved'),
-                                _buildFilterChip('Dismissed', 'dismissed'),
-                              ],
-                            ),
-                          ],
-                        ),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 12,
+                        runSpacing: 12,
+                        children: [
+                          _buildFilterChip('All Reports', 'all'),
+                          _buildFilterChip('Pending', 'pending'),
+                          _buildFilterChip('Reviewing', 'reviewing'),
+                          _buildFilterChip('Resolved', 'resolved'),
+                          _buildFilterChip('Dismissed', 'dismissed'),
+                        ],
                       ),
                     ],
                   ),
@@ -513,35 +362,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                             ),
                           ),
                         )
-                      : _viewMode == 'list'
-                          ? ListView.separated(
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
-                              itemCount: reports.length,
-                              separatorBuilder: (_, __) =>
-                                  const SizedBox(height: 16),
-                              itemBuilder: (context, index) {
-                                final report = reports[index];
-                                final data =
-                                    report.data() as Map<String, dynamic>;
-                                return ReportCard(
-                                  reportId: report.id,
-                                  data: data,
-                                  onTap: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => ReportDetailPage(
-                                          reportId: report.id,
-                                          reportData: data,
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                );
-                              },
-                            )
-                          : _buildGroupedView(reports),
+                      : _buildUnifiedReportView(reports),
                 ),
               ],
             ),
@@ -551,28 +372,224 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     );
   }
 
-  Widget _buildViewModeChip(String label, String mode, IconData icon) {
-    final isSelected = _viewMode == mode;
-    return FilterChip(
-      label: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16),
-          const SizedBox(width: 6),
-          Text(label),
-        ],
-      ),
-      selected: isSelected,
-      onSelected: (_) {
-        setState(() => _viewMode = mode);
+  /// Build unified view showing one entry per video per status (grouped by videoId and status)
+  Widget _buildUnifiedReportView(List<QueryDocumentSnapshot> reports) {
+    // If showing all reports, group by videoId only (merge all statuses)
+    // If filtering by specific status, show individual reports
+    if (_currentFilter == 'all') {
+      return _buildGroupedByVideoView(reports);
+    } else {
+      return _buildIndividualReportsView(reports);
+    }
+  }
+
+  /// Build view with reports grouped by videoId (for "All Reports" filter)
+  Widget _buildGroupedByVideoView(List<QueryDocumentSnapshot> reports) {
+    // Group reports by videoId only
+    final groupedReports = <String, List<QueryDocumentSnapshot>>{};
+    for (var report in reports) {
+      final data = report.data() as Map<String, dynamic>;
+      final videoId = data['videoId'] as String? ?? '';
+
+      if (videoId.isNotEmpty) {
+        groupedReports.putIfAbsent(videoId, () => []);
+        groupedReports[videoId]!.add(report);
+      }
+    }
+
+    // Sort by number of reports (most reported first)
+    final sortedVideoIds = groupedReports.keys.toList()
+      ..sort((a, b) =>
+          groupedReports[b]!.length.compareTo(groupedReports[a]!.length));
+
+    return ListView.separated(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: sortedVideoIds.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 16),
+      itemBuilder: (context, index) {
+        final videoId = sortedVideoIds[index];
+        final videoReports = groupedReports[videoId]!;
+        final reportCount = videoReports.length;
+
+        // Use the first report as the representative
+        final report = videoReports.first;
+        final data = report.data() as Map<String, dynamic>;
+
+        return InkWell(
+          onTap: () {
+            // If multiple reports, show dialog to select which one to view
+            if (reportCount > 1) {
+              _showVideoReportsDialog(videoReports, data['videoTitle']);
+            } else {
+              // Single report, go directly to detail page
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ReportDetailPage(
+                    reportId: report.id,
+                    reportData: data,
+                  ),
+                ),
+              );
+            }
+          },
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            decoration: BoxDecoration(
+              border: Border.all(
+                color: reportCount > 3
+                    ? Colors.red
+                    : reportCount > 1
+                        ? Colors.orange
+                        : Colors.grey[300]!,
+                width: reportCount > 3 ? 2 : 1,
+              ),
+              borderRadius: BorderRadius.circular(12),
+              color: reportCount > 3
+                  ? Colors.red.withOpacity(0.05)
+                  : reportCount > 1
+                      ? Colors.orange.withOpacity(0.05)
+                      : null,
+            ),
+            child: Stack(
+              children: [
+                // Main report card
+                ReportCard(
+                  reportId: report.id,
+                  data: data,
+                  showStatusAndReason: false,
+                  showReportedBy: false,
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ReportDetailPage(
+                          reportId: report.id,
+                          reportData: data,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                // Report count badge (only if multiple reports for same video)
+                if (reportCount > 1)
+                  Positioned(
+                    top: 12,
+                    right: 12,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: reportCount > 3 ? Colors.red : Colors.orange,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.2),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.layers,
+                            size: 14,
+                            color: Colors.white,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '$reportCount Reports',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                // High priority indicator
+                if (reportCount > 3)
+                  Positioned(
+                    top: 48,
+                    right: 12,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.2),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.priority_high,
+                              size: 12, color: Colors.white),
+                          SizedBox(width: 2),
+                          Text(
+                            'HIGH',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 10,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
       },
-      backgroundColor: Colors.grey[100],
-      selectedColor: Colors.blue.withOpacity(0.2),
-      checkmarkColor: Colors.blue,
-      labelStyle: TextStyle(
-        color: isSelected ? Colors.blue : Colors.black87,
-        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-      ),
+    );
+  }
+
+  /// Build view with individual reports (for specific status filters)
+  Widget _buildIndividualReportsView(List<QueryDocumentSnapshot> reports) {
+    return ListView.separated(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: reports.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 16),
+      itemBuilder: (context, index) {
+        final report = reports[index];
+        final data = report.data() as Map<String, dynamic>;
+
+        return ReportCard(
+          reportId: report.id,
+          data: data,
+          showStatusAndReason: false,
+          showReportedBy: false,
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ReportDetailPage(
+                  reportId: report.id,
+                  reportData: data,
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -594,236 +611,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     );
   }
 
-  Widget _buildGroupedView(List<QueryDocumentSnapshot> reports) {
-    final groupedReports = _groupReportsByVideo(reports);
-
-    if (groupedReports.isEmpty) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(40.0),
-          child: Column(
-            children: [
-              Icon(Icons.video_library, size: 64, color: Colors.grey),
-              SizedBox(height: 16),
-              Text(
-                'No videos with reports',
-                style: TextStyle(
-                  fontSize: 18,
-                  color: Colors.grey,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    return ListView.separated(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: groupedReports.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 16),
-      itemBuilder: (context, index) {
-        final videoId = groupedReports.keys.elementAt(index);
-        final videoReports = groupedReports[videoId]!;
-        final firstReport = videoReports.first.data() as Map<String, dynamic>;
-        final reportCount = videoReports.length;
-
-        return InkWell(
-          onTap: () {
-            _showVideoReportsDialog(videoReports, firstReport['videoTitle']);
-          },
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              border: Border.all(
-                color: reportCount > 3
-                    ? Colors.red
-                    : reportCount > 1
-                        ? Colors.orange
-                        : Colors.grey[300]!,
-                width: reportCount > 3 ? 2 : 1,
-              ),
-              borderRadius: BorderRadius.circular(12),
-              color: reportCount > 3
-                  ? Colors.red.withOpacity(0.05)
-                  : reportCount > 1
-                      ? Colors.orange.withOpacity(0.05)
-                      : null,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    // Report Count Badge
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: reportCount > 3
-                            ? Colors.red
-                            : reportCount > 1
-                                ? Colors.orange
-                                : Colors.blue,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.report,
-                            size: 14,
-                            color: Colors.white,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            '$reportCount ${reportCount == 1 ? 'Report' : 'Reports'}',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    // High Priority Badge
-                    if (reportCount > 3)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.red.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: Colors.red, width: 1.5),
-                        ),
-                        child: const Row(
-                          children: [
-                            Icon(Icons.priority_high,
-                                size: 14, color: Colors.red),
-                            SizedBox(width: 4),
-                            Text(
-                              'HIGH PRIORITY',
-                              style: TextStyle(
-                                color: Colors.red,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 11,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    const Spacer(),
-                    Icon(Icons.chevron_right, color: Colors.grey[400]),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    const Icon(Icons.video_library,
-                        size: 20, color: Colors.blue),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        firstReport['videoTitle'] as String? ??
-                            'Untitled Video',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    const Icon(Icons.person, size: 16, color: Colors.grey),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        'Uploader: ${firstReport['uploaderEmail'] as String? ?? 'Unknown'}',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                // Show report reasons summary
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: _getReasonsSummary(videoReports),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  List<Widget> _getReasonsSummary(List<QueryDocumentSnapshot> reports) {
-    final reasonCounts = <String, int>{};
-    for (var report in reports) {
-      final data = report.data() as Map<String, dynamic>;
-      final reason = data['reason'] as String? ?? 'other';
-      reasonCounts[reason] = (reasonCounts[reason] ?? 0) + 1;
-    }
-
-    return reasonCounts.entries.map((entry) {
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(
-          color: Colors.grey[200],
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Text(
-          '${_formatReasonShort(entry.key)}: ${entry.value}',
-          style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: Colors.black87,
-          ),
-        ),
-      );
-    }).toList();
-  }
-
-  String _formatReasonShort(String reason) {
-    switch (reason.toLowerCase()) {
-      case 'inappropriate':
-        return 'Inappropriate';
-      case 'spam':
-        return 'Spam';
-      case 'misleading':
-        return 'Misleading';
-      case 'copyright':
-        return 'Copyright';
-      case 'violence':
-        return 'Violence';
-      case 'hatespeech':
-        return 'Hate Speech';
-      case 'other':
-        return 'Other';
-      default:
-        return reason;
-    }
-  }
-
+  /// Show dialog with all reports for a video when there are multiple
   void _showVideoReportsDialog(
       List<QueryDocumentSnapshot> reports, String? videoTitle) {
     showDialog(
@@ -872,6 +660,15 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 ],
               ),
               const Divider(height: 30),
+              const Text(
+                'Select a report to view details:',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 12),
               Expanded(
                 child: ListView.separated(
                   shrinkWrap: true,

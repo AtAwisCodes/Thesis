@@ -4,7 +4,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 
 class UserManagementPage extends StatefulWidget {
-  const UserManagementPage({super.key});
+  final String? initialSearchQuery;
+
+  const UserManagementPage({super.key, this.initialSearchQuery});
 
   @override
   State<UserManagementPage> createState() => _UserManagementPageState();
@@ -17,6 +19,17 @@ class _UserManagementPageState extends State<UserManagementPage> {
   String _searchQuery = '';
   String _filterStatus = 'all'; // all, active, suspended, deleted
   final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    // Set initial search query if provided
+    if (widget.initialSearchQuery != null &&
+        widget.initialSearchQuery!.isNotEmpty) {
+      _searchQuery = widget.initialSearchQuery!.toLowerCase();
+      _searchController.text = widget.initialSearchQuery!;
+    }
+  }
 
   @override
   void dispose() {
@@ -658,8 +671,14 @@ class _UserManagementPageState extends State<UserManagementPage> {
                   );
                 }
 
-                return ListView.builder(
+                return GridView.builder(
                   padding: const EdgeInsets.all(20),
+                  gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                    maxCrossAxisExtent: 450,
+                    childAspectRatio: 1.3,
+                    crossAxisSpacing: 16,
+                    mainAxisSpacing: 16,
+                  ),
                   itemCount: users.length,
                   itemBuilder: (context, index) {
                     final user = users[index];
@@ -712,7 +731,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
     }
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 16),
+      margin: EdgeInsets.zero,
       elevation: 2,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),

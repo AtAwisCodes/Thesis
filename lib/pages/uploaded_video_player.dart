@@ -66,8 +66,9 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
   String? _uploaderUserId;
   bool _showPlayPauseButton = false;
   String _videoDescription = '';
-  String _selectedTab = 'Steps'; // Track selected tab: 'Steps' or 'Information'
+  String _selectedTab = 'Steps';
   Map<String, dynamic>? _videoData;
+  bool _isFullscreen = false;
 
   @override
   void initState() {
@@ -85,6 +86,12 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
         if (mounted) {
           setState(() {});
           _controller.play();
+          // Listen to position changes to update time indicator
+          _controller.addListener(() {
+            if (mounted) {
+              setState(() {});
+            }
+          });
         }
       });
 
@@ -568,12 +575,38 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
   }
 
   void _enterFullscreen() {
+    setState(() {
+      _isFullscreen = true;
+    });
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => FullscreenVideoPlayer(controller: _controller),
       ),
-    );
+    ).then((_) {
+      // When coming back from fullscreen, update the state
+      if (mounted) {
+        setState(() {
+          _isFullscreen = false;
+        });
+      }
+    });
+  }
+
+  void _exitFullscreen() {
+    Navigator.pop(context);
+  }
+
+  String _formatDuration(Duration duration) {
+    String twoDigits(int n) => n.toString().padLeft(2, '0');
+    final hours = duration.inHours;
+    final minutes = duration.inMinutes.remainder(60);
+    final seconds = duration.inSeconds.remainder(60);
+
+    if (hours > 0) {
+      return '$hours:${twoDigits(minutes)}:${twoDigits(seconds)}';
+    }
+    return '${minutes}:${twoDigits(seconds)}';
   }
 
   // Toggle like for the video
@@ -1519,14 +1552,124 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
                                   ),
                                 ),
                               ),
-                            // Fullscreen button
+                            // Bottom controls bar
                             Positioned(
-                              bottom: 10,
-                              right: 10,
-                              child: IconButton(
-                                icon: const Icon(Icons.fullscreen,
-                                    color: Colors.white),
-                                onPressed: _enterFullscreen,
+                              bottom: 0,
+                              left: 0,
+                              right: 0,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.bottomCenter,
+                                    end: Alignment.topCenter,
+                                    colors: [
+                                      Colors.black.withOpacity(0.7),
+                                      Colors.transparent,
+                                    ],
+                                  ),
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    // Time indicator (current / total)
+                                    Align(
+                                      alignment: Alignment.centerLeft,
+                                      child: Text(
+                                        '${_formatDuration(_controller.value.position)} / ${_formatDuration(_controller.value.duration)}',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w500,
+                                          shadows: [
+                                            Shadow(
+                                              color: Colors.black,
+                                              blurRadius: 4,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    // Video progress slider with fullscreen button
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: SliderTheme(
+                                            data: SliderThemeData(
+                                              trackHeight: 3,
+                                              thumbShape:
+                                                  const RoundSliderThumbShape(
+                                                enabledThumbRadius: 6,
+                                              ),
+                                              overlayShape:
+                                                  const RoundSliderOverlayShape(
+                                                overlayRadius: 12,
+                                              ),
+                                              activeTrackColor:
+                                                  const Color(0xff5BEC84),
+                                              inactiveTrackColor:
+                                                  Colors.white.withOpacity(0.3),
+                                              thumbColor:
+                                                  const Color(0xff5BEC84),
+                                              overlayColor:
+                                                  const Color(0xff5BEC84)
+                                                      .withOpacity(0.3),
+                                            ),
+                                            child: Slider(
+                                              value: _controller
+                                                  .value.position.inSeconds
+                                                  .toDouble()
+                                                  .clamp(
+                                                    0.0,
+                                                    _controller.value.duration
+                                                        .inSeconds
+                                                        .toDouble(),
+                                                  ),
+                                              min: 0.0,
+                                              max: _controller.value.duration
+                                                          .inSeconds >
+                                                      0
+                                                  ? _controller
+                                                      .value.duration.inSeconds
+                                                      .toDouble()
+                                                  : 1.0,
+                                              onChanged: (value) {
+                                                _controller.seekTo(Duration(
+                                                    seconds: value.toInt()));
+                                              },
+                                            ),
+                                          ),
+                                        ),
+                                        // Fullscreen button
+                                        IconButton(
+                                          icon: Icon(
+                                            _isFullscreen
+                                                ? Icons.fullscreen_exit
+                                                : Icons.fullscreen,
+                                            color: Colors.white,
+                                          ),
+                                          iconSize: 24,
+                                          padding: const EdgeInsets.all(4),
+                                          constraints: const BoxConstraints(),
+                                          onPressed: () {
+                                            if (_isFullscreen) {
+                                              _exitFullscreen();
+                                            } else {
+                                              _enterFullscreen();
+                                            }
+                                          },
+                                          tooltip: _isFullscreen
+                                              ? 'Exit Fullscreen'
+                                              : 'Enter Fullscreen',
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ],
@@ -1603,94 +1746,142 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
 
                 // Uploader Avatar + Name + Actions
                 Padding(
-                  padding: const EdgeInsets.all(8.0),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12.0, vertical: 8.0),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       // Uploader info with real-time data
-                      Row(
-                        children: [
-                          CircleAvatar(
-                            radius: 20,
-                            backgroundImage: avatarUrl.isNotEmpty
-                                ? NetworkImage(avatarUrl)
-                                : null,
-                            child: avatarUrl.isEmpty
-                                ? const Icon(Icons.person)
-                                : null,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            uploaderName.isNotEmpty
-                                ? uploaderName
-                                : "Anonymous",
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 12,
+                      Expanded(
+                        child: Row(
+                          children: [
+                            CircleAvatar(
+                              radius: 20,
+                              backgroundImage: avatarUrl.isNotEmpty
+                                  ? NetworkImage(avatarUrl)
+                                  : null,
+                              child: avatarUrl.isEmpty
+                                  ? const Icon(Icons.person, size: 20)
+                                  : null,
                             ),
-                          ),
-                        ],
+                            const SizedBox(width: 8),
+                            Flexible(
+                              child: Text(
+                                uploaderName.isNotEmpty
+                                    ? uploaderName
+                                    : "Anonymous",
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
 
-                      // Like / Dislike / Follow
+                      // Like / Dislike / Follow - Better aligned
                       Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
                           // Like button with count
-                          Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              IconButton(
-                                icon: Icon(
-                                  Icons.thumb_up,
-                                  color: isLiked ? Colors.green : Colors.grey,
+                          Container(
+                            margin: const EdgeInsets.symmetric(horizontal: 4),
+                            decoration: BoxDecoration(
+                              color: isLiked
+                                  ? Colors.green.withOpacity(0.1)
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: Icon(
+                                    isLiked
+                                        ? Icons.thumb_up
+                                        : Icons.thumb_up_outlined,
+                                    size: 22,
+                                  ),
+                                  color:
+                                      isLiked ? Colors.green : Colors.grey[600],
+                                  onPressed: _toggleLike,
+                                  padding: const EdgeInsets.all(8),
+                                  constraints: const BoxConstraints(
+                                    minWidth: 40,
+                                    minHeight: 40,
+                                  ),
                                 ),
-                                onPressed: _toggleLike,
-                              ),
-                              Text(
-                                '$_likeCount',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  color: Colors.grey[600],
+                                Text(
+                                  '$_likeCount',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: isLiked
+                                        ? Colors.green
+                                        : Colors.grey[600],
+                                  ),
                                 ),
-                              ),
-                            ],
+                                const SizedBox(height: 4),
+                              ],
+                            ),
                           ),
                           // Dislike button
-                          IconButton(
-                            icon: Icon(
-                              Icons.thumb_down,
-                              color: isDisliked ? Colors.red : Colors.grey,
+                          Container(
+                            margin: const EdgeInsets.symmetric(horizontal: 4),
+                            decoration: BoxDecoration(
+                              color: isDisliked
+                                  ? Colors.red.withOpacity(0.1)
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(8),
                             ),
-                            onPressed: () {
-                              setState(() {
-                                isDisliked = !isDisliked;
-                                if (isDisliked) isLiked = false;
-                              });
-                            },
+                            child: IconButton(
+                              icon: Icon(
+                                isDisliked
+                                    ? Icons.thumb_down
+                                    : Icons.thumb_down_outlined,
+                                size: 22,
+                              ),
+                              color: isDisliked ? Colors.red : Colors.grey[600],
+                              onPressed: () {
+                                setState(() {
+                                  isDisliked = !isDisliked;
+                                  if (isDisliked) isLiked = false;
+                                });
+                              },
+                              padding: const EdgeInsets.all(8),
+                              constraints: const BoxConstraints(
+                                minWidth: 40,
+                                minHeight: 40,
+                              ),
+                            ),
                           ),
-                          const SizedBox(width: 10),
+                          const SizedBox(width: 8),
                           // Follow button
                           SizedBox(
-                            width: 90,
                             height: 36,
                             child: ElevatedButton(
                               onPressed: _toggleFollow,
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: isFollowed
-                                    ? Colors.grey
+                                    ? Colors.grey[300]
                                     : const Color(0xff5BEC84),
-                                padding: EdgeInsets.zero,
+                                foregroundColor: isFollowed
+                                    ? Colors.grey[700]
+                                    : Colors.black,
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 8),
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(18),
+                                ),
                               ),
-                              child: FittedBox(
-                                fit: BoxFit.scaleDown,
-                                child: Text(
-                                  isFollowed ? "Followed" : "Follow",
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: isFollowed
-                                        ? Colors.white70
-                                        : Colors.black,
-                                  ),
+                              child: Text(
+                                isFollowed ? "Following" : "Follow",
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
                                 ),
                               ),
                             ),
