@@ -11,6 +11,7 @@ import 'package:rexplore/pages/notif_page.dart';
 import 'package:rexplore/pages/profile_page.dart';
 import 'package:rexplore/pages/upload_page.dart';
 import 'package:rexplore/pages/videos_page.dart';
+import 'package:rexplore/pages/about_us_page.dart';
 import 'package:rexplore/services/ThemeProvider.dart';
 import 'package:rexplore/services/auth_service.dart';
 import 'package:rexplore/viewmodel/yt_videoview_model.dart';
@@ -220,8 +221,13 @@ class _HomePageState extends State<HomePage> {
                               title: const Text('About Us'),
                               subtitle: const Text('Learn more about ReXplore'),
                               onTap: () {
-                                // TODO: Add About Us page navigation
                                 Navigator.pop(context);
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const AboutUsPage(),
+                                  ),
+                                );
                               },
                             ),
                           ],
@@ -373,10 +379,10 @@ class _HomePageState extends State<HomePage> {
 
                     return CurvedNavigationBar(
                       backgroundColor: Colors.transparent,
-                      buttonBackgroundColor:
-                          theme.colorScheme.primary.withOpacity(0.9),
+                      buttonBackgroundColor: Colors.transparent,
                       color: theme.appBarTheme.backgroundColor ?? Colors.white,
                       items: navigationItems,
+                      height: 60,
                       animationDuration: const Duration(milliseconds: 300),
                       index: page,
                       onTap: (selectedIndex) {
