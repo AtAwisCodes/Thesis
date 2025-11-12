@@ -12,11 +12,10 @@ import 'package:rexplore/pages/profile_page.dart';
 import 'package:rexplore/pages/upload_page.dart';
 import 'package:rexplore/pages/videos_page.dart';
 import 'package:rexplore/pages/about_us_page.dart';
-import 'package:rexplore/services/ThemeProvider.dart';
+import 'package:rexplore/pages/settings_page.dart';
 import 'package:rexplore/services/auth_service.dart';
 import 'package:rexplore/viewmodel/yt_videoview_model.dart';
 import 'package:rexplore/utilities/responsive_helper.dart';
-import 'package:rexplore/components/system_report_dialog.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -190,36 +189,22 @@ class _HomePageState extends State<HomePage> {
                         child: ListView(
                           padding: EdgeInsets.zero,
                           children: [
-                            SwitchListTile(
-                              title: const Text("Theme Mode"),
-                              subtitle: const Text("Dark/Light Mode"),
-                              value: Provider.of<ThemeProvider>(context)
-                                  .isDarkMode,
-                              onChanged: (val) {
-                                Provider.of<ThemeProvider>(context,
-                                        listen: false)
-                                    .toggleTheme(val);
-                              },
-                              secondary: const Icon(Icons.brightness_6),
-                            ),
-                            const Divider(),
                             ListTile(
-                              leading: const Icon(Icons.feedback),
-                              title: const Text('Report System Issue'),
-                              subtitle: const Text('Help us improve'),
+                              leading: const Icon(Icons.settings),
+                              title: const Text('Settings'),
                               onTap: () {
-                                Navigator.pop(context); // Close drawer
-                                showDialog(
-                                  context: context,
-                                  builder: (context) =>
-                                      const SystemReportDialog(),
+                                Navigator.pop(context);
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const SettingsPage(),
+                                  ),
                                 );
                               },
                             ),
                             ListTile(
                               leading: const Icon(Icons.info_outline),
                               title: const Text('About Us'),
-                              subtitle: const Text('Learn more about ReXplore'),
                               onTap: () {
                                 Navigator.pop(context);
                                 Navigator.push(

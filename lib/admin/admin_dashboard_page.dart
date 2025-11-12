@@ -5,7 +5,8 @@ import 'package:rexplore/admin/widgets/report_card.dart';
 import 'package:rexplore/admin/widgets/stats_card.dart';
 import 'package:rexplore/admin/report_detail_page.dart';
 import 'package:rexplore/admin/user_management_page.dart';
-import 'package:rexplore/admin/system_reports_page.dart';
+import 'package:rexplore/admin/user_feedback_page.dart';
+import 'package:rexplore/admin/bug_reports_page.dart';
 
 class AdminDashboardPage extends StatefulWidget {
   const AdminDashboardPage({super.key});
@@ -19,6 +20,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   String _currentFilter = 'all';
+  String _currentPage = 'video_reports'; // Track current page
 
   Map<String, int> _stats = {
     'pending': 0,
@@ -128,260 +130,485 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     setState(() => _stats = stats);
   }
 
+  Widget _buildSidebar(BuildContext context, User? user) {
+    return Container(
+      width: 280,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 8,
+            offset: const Offset(2, 0),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Sidebar Header
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Colors.deepPurple,
+                  Colors.deepPurple.shade300,
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const CircleAvatar(
+                  radius: 32,
+                  backgroundColor: Colors.white,
+                  child: Icon(
+                    Icons.admin_panel_settings,
+                    size: 36,
+                    color: Colors.deepPurple,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Admin Panel',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  user?.email ?? '',
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 12,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          // Navigation Items
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              children: [
+                _buildSidebarItem(
+                  context,
+                  icon: Icons.video_library,
+                  title: 'Video Reports',
+                  subtitle: 'User-uploaded video reports',
+                  color: Colors.deepPurple,
+                  isSelected: _currentPage == 'video_reports',
+                  onTap: () {
+                    setState(() => _currentPage = 'video_reports');
+                  },
+                ),
+                const Divider(height: 1),
+                _buildSidebarItem(
+                  context,
+                  icon: Icons.bug_report,
+                  title: 'Bug Reports',
+                  subtitle: 'App bugs & issues',
+                  color: Colors.red,
+                  isSelected: _currentPage == 'bug_reports',
+                  onTap: () {
+                    setState(() => _currentPage = 'bug_reports');
+                  },
+                ),
+                const Divider(height: 1),
+                _buildSidebarItem(
+                  context,
+                  icon: Icons.feedback_outlined,
+                  title: 'User Feedback',
+                  subtitle: 'Suggestions & comments',
+                  color: Colors.blue,
+                  isSelected: _currentPage == 'user_feedback',
+                  onTap: () {
+                    setState(() => _currentPage = 'user_feedback');
+                  },
+                ),
+                const Divider(height: 1),
+                _buildSidebarItem(
+                  context,
+                  icon: Icons.people,
+                  title: 'User Management',
+                  subtitle: 'Manage app users',
+                  color: Colors.green,
+                  isSelected: _currentPage == 'user_management',
+                  onTap: () {
+                    setState(() => _currentPage = 'user_management');
+                  },
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSidebarItem(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Color color,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return Container(
+      color: isSelected ? color.withOpacity(0.1) : null,
+      child: ListTile(
+        leading: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: color.withOpacity(isSelected ? 0.2 : 0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, color: color, size: 24),
+        ),
+        title: Text(
+          title,
+          style: TextStyle(
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+            fontSize: 15,
+          ),
+        ),
+        subtitle: Text(
+          subtitle,
+          style: const TextStyle(
+            fontSize: 12,
+            color: Colors.grey,
+          ),
+        ),
+        onTap: onTap,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 20,
+          vertical: 4,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = _auth.currentUser;
 
     return Scaffold(
       backgroundColor: Colors.grey[100],
-      appBar: AppBar(
-        title: const Row(
-          children: [
-            Icon(Icons.dashboard, size: 28),
-            SizedBox(width: 12),
-            Text(
-              'User Video Reports',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-          ],
-        ),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black87,
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.bug_report),
-            tooltip: 'System Reports',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const SystemReportsPage(),
-                ),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.people),
-            tooltip: 'User Management',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const UserManagementPage(),
-                ),
-              );
-            },
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: Center(
-              child: Text(
-                user?.email ?? '',
-                style: const TextStyle(fontSize: 14),
-              ),
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: 'Logout',
-            onPressed: _logout,
-          ),
-        ],
-      ),
-      body: StreamBuilder<QuerySnapshot>(
-        key: ValueKey(_currentFilter),
-        stream: _getReportsStream(),
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.error_outline, size: 64, color: Colors.red),
-                  const SizedBox(height: 16),
-                  Text('Error: ${snapshot.error}'),
-                ],
-              ),
-            );
-          }
-
-          if (!snapshot.hasData) {
-            return const Center(
-              child: CircularProgressIndicator(),
-            );
-          }
-
-          final allReports = snapshot.data!.docs;
-
-          // Filter out YouTube video reports, only show user-uploaded videos
-          final reports = _filterUserUploadedReports(allReports);
-
-          // Update stats whenever data changes
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            _updateStats(reports);
-          });
-
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
+      body: Row(
+        children: [
+          // Fixed sidebar
+          _buildSidebar(context, user),
+          // Main content
+          Expanded(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Stats Cards
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    final cardWidth = constraints.maxWidth > 1200
-                        ? (constraints.maxWidth - 60) / 4
-                        : constraints.maxWidth > 800
-                            ? (constraints.maxWidth - 40) / 2
-                            : constraints.maxWidth;
-
-                    return Wrap(
-                      spacing: 20,
-                      runSpacing: 20,
-                      children: [
-                        InkWell(
-                          onTap: () {
-                            setState(() => _currentFilter = 'pending');
-                          },
-                          borderRadius: BorderRadius.circular(12),
-                          child: StatsCard(
-                            title: 'Pending',
-                            count: _stats['pending']!,
-                            icon: Icons.pending,
-                            color: Colors.orange,
-                            width: cardWidth,
-                          ),
-                        ),
-                        InkWell(
-                          onTap: () {
-                            setState(() => _currentFilter = 'reviewing');
-                          },
-                          borderRadius: BorderRadius.circular(12),
-                          child: StatsCard(
-                            title: 'Reviewing',
-                            count: _stats['reviewing']!,
-                            icon: Icons.remove_red_eye,
-                            color: Colors.blue,
-                            width: cardWidth,
-                          ),
-                        ),
-                        InkWell(
-                          onTap: () {
-                            setState(() => _currentFilter = 'resolved');
-                          },
-                          borderRadius: BorderRadius.circular(12),
-                          child: StatsCard(
-                            title: 'Resolved',
-                            count: _stats['resolved']!,
-                            icon: Icons.check_circle,
-                            color: Colors.green,
-                            width: cardWidth,
-                          ),
-                        ),
-                        InkWell(
-                          onTap: () {
-                            setState(() => _currentFilter = 'dismissed');
-                          },
-                          borderRadius: BorderRadius.circular(12),
-                          child: StatsCard(
-                            title: 'Dismissed',
-                            count: _stats['dismissed']!,
-                            icon: Icons.cancel,
-                            color: Colors.red,
-                            width: cardWidth,
-                          ),
-                        ),
-                      ],
-                    );
-                  },
-                ),
-
-                const SizedBox(height: 30),
-
-                // Filter by Status Section
+                // AppBar
                 Container(
-                  padding: const EdgeInsets.all(16),
+                  height: 64,
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withOpacity(0.05),
-                        blurRadius: 10,
+                        blurRadius: 4,
                         offset: const Offset(0, 2),
                       ),
                     ],
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: Row(
                     children: [
-                      const Text(
-                        'Filter by Status',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black54,
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                        child: Row(
+                          children: [
+                            Icon(_getPageIcon(), size: 28),
+                            const SizedBox(width: 12),
+                            Text(
+                              _getPageTitle(),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 20,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 12,
-                        runSpacing: 12,
-                        children: [
-                          _buildFilterChip('All Reports', 'all'),
-                          _buildFilterChip('Pending', 'pending'),
-                          _buildFilterChip('Reviewing', 'reviewing'),
-                          _buildFilterChip('Resolved', 'resolved'),
-                          _buildFilterChip('Dismissed', 'dismissed'),
-                        ],
+                      const Spacer(),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                        child: Center(
+                          child: Text(
+                            user?.email ?? '',
+                            style: const TextStyle(fontSize: 14),
+                          ),
+                        ),
                       ),
+                      IconButton(
+                        icon: const Icon(Icons.logout),
+                        tooltip: 'Logout',
+                        onPressed: _logout,
+                      ),
+                      const SizedBox(width: 8),
                     ],
                   ),
                 ),
-
-                const SizedBox(height: 20),
-
-                // Reports List
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 10,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: reports.isEmpty
-                      ? const Center(
-                          child: Padding(
-                            padding: EdgeInsets.all(40.0),
-                            child: Column(
-                              children: [
-                                Icon(Icons.inbox, size: 64, color: Colors.grey),
-                                SizedBox(height: 16),
-                                Text(
-                                  'No reports found',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    color: Colors.grey,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        )
-                      : _buildUnifiedReportView(reports),
+                // Main content area
+                Expanded(
+                  child: _buildCurrentPage(),
                 ),
               ],
             ),
-          );
-        },
+          ),
+        ],
       ),
+    );
+  }
+
+  Widget _buildCurrentPage() {
+    switch (_currentPage) {
+      case 'video_reports':
+        return _buildVideoReportsPage();
+      case 'bug_reports':
+        return const BugReportsPage();
+      case 'user_feedback':
+        return const UserFeedbackPage();
+      case 'user_management':
+        return const UserManagementPage();
+      default:
+        return _buildVideoReportsPage();
+    }
+  }
+
+  String _getPageTitle() {
+    switch (_currentPage) {
+      case 'video_reports':
+        return 'Video Reports';
+      case 'bug_reports':
+        return 'Bug Reports';
+      case 'user_feedback':
+        return 'User Feedback';
+      case 'user_management':
+        return 'User Management';
+      default:
+        return 'Admin Dashboard';
+    }
+  }
+
+  IconData _getPageIcon() {
+    switch (_currentPage) {
+      case 'video_reports':
+        return Icons.video_library;
+      case 'bug_reports':
+        return Icons.bug_report;
+      case 'user_feedback':
+        return Icons.feedback_outlined;
+      case 'user_management':
+        return Icons.people;
+      default:
+        return Icons.dashboard;
+    }
+  }
+
+  Widget _buildVideoReportsPage() {
+    return StreamBuilder<QuerySnapshot>(
+      key: ValueKey(_currentFilter),
+      stream: _getReportsStream(),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                const SizedBox(height: 16),
+                Text('Error: ${snapshot.error}'),
+              ],
+            ),
+          );
+        }
+
+        if (!snapshot.hasData) {
+          return const Center(
+            child: CircularProgressIndicator(),
+          );
+        }
+
+        final allReports = snapshot.data!.docs;
+
+        // Filter out YouTube video reports, only show user-uploaded videos
+        final reports = _filterUserUploadedReports(allReports);
+
+        // Update stats whenever data changes
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _updateStats(reports);
+        });
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Stats Cards
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final cardWidth = constraints.maxWidth > 1200
+                      ? (constraints.maxWidth - 60) / 4
+                      : constraints.maxWidth > 800
+                          ? (constraints.maxWidth - 40) / 2
+                          : constraints.maxWidth;
+
+                  return Wrap(
+                    spacing: 20,
+                    runSpacing: 20,
+                    children: [
+                      InkWell(
+                        onTap: () {
+                          setState(() => _currentFilter = 'pending');
+                        },
+                        borderRadius: BorderRadius.circular(12),
+                        child: StatsCard(
+                          title: 'Pending',
+                          count: _stats['pending']!,
+                          icon: Icons.pending,
+                          color: Colors.orange,
+                          width: cardWidth,
+                        ),
+                      ),
+                      InkWell(
+                        onTap: () {
+                          setState(() => _currentFilter = 'reviewing');
+                        },
+                        borderRadius: BorderRadius.circular(12),
+                        child: StatsCard(
+                          title: 'Reviewing',
+                          count: _stats['reviewing']!,
+                          icon: Icons.remove_red_eye,
+                          color: Colors.blue,
+                          width: cardWidth,
+                        ),
+                      ),
+                      InkWell(
+                        onTap: () {
+                          setState(() => _currentFilter = 'resolved');
+                        },
+                        borderRadius: BorderRadius.circular(12),
+                        child: StatsCard(
+                          title: 'Resolved',
+                          count: _stats['resolved']!,
+                          icon: Icons.check_circle,
+                          color: Colors.green,
+                          width: cardWidth,
+                        ),
+                      ),
+                      InkWell(
+                        onTap: () {
+                          setState(() => _currentFilter = 'dismissed');
+                        },
+                        borderRadius: BorderRadius.circular(12),
+                        child: StatsCard(
+                          title: 'Dismissed',
+                          count: _stats['dismissed']!,
+                          icon: Icons.cancel,
+                          color: Colors.red,
+                          width: cardWidth,
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+
+              const SizedBox(height: 30),
+
+              // Filter by Status Section
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Filter by Status',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black54,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 12,
+                      children: [
+                        _buildFilterChip('All Reports', 'all'),
+                        _buildFilterChip('Pending', 'pending'),
+                        _buildFilterChip('Reviewing', 'reviewing'),
+                        _buildFilterChip('Resolved', 'resolved'),
+                        _buildFilterChip('Dismissed', 'dismissed'),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              // Reports List
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: reports.isEmpty
+                    ? const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(40.0),
+                          child: Column(
+                            children: [
+                              Icon(Icons.inbox, size: 64, color: Colors.grey),
+                              SizedBox(height: 16),
+                              Text(
+                                'No reports found',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    : _buildUnifiedReportView(reports),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 

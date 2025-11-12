@@ -441,4 +441,202 @@ class ReportService {
       return false;
     }
   }
+
+  /// Submit user feedback
+  Future<bool> submitFeedback({
+    required String feedback,
+  }) async {
+    try {
+      final currentUser = _auth.currentUser;
+      if (currentUser == null) {
+        print('User not logged in');
+        return false;
+      }
+
+      // Get user info
+      final userDoc =
+          await _firestore.collection('count').doc(currentUser.uid).get();
+
+      String userName = 'Anonymous';
+      String userEmail = currentUser.email ?? '';
+
+      if (userDoc.exists) {
+        final data = userDoc.data()!;
+        userName =
+            '${data['first_name'] ?? ''} ${data['last_name'] ?? ''}'.trim();
+        if (userName.isEmpty) userName = 'Anonymous';
+      }
+
+      // Create feedback document
+      final feedbackData = {
+        'userId': currentUser.uid,
+        'userName': userName,
+        'userEmail': userEmail,
+        'feedback': feedback,
+        'status': 'pending', // pending, reviewed, resolved
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+        'adminNotes': '',
+        'reviewedAt': null,
+        'reviewedBy': null,
+      };
+
+      await _firestore.collection('user_feedback').add(feedbackData);
+      print('Feedback submitted successfully');
+      return true;
+    } catch (e) {
+      print('Error submitting feedback: $e');
+      return false;
+    }
+  }
+
+  /// Stream user feedback for admin dashboard
+  Stream<List<Map<String, dynamic>>> streamUserFeedback({String? status}) {
+    Query query = _firestore.collection('user_feedback');
+
+    if (status != null) {
+      query = query.where('status', isEqualTo: status);
+    }
+
+    query = query.orderBy('createdAt', descending: true);
+
+    return query.snapshots().map((snapshot) {
+      return snapshot.docs.map((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        data['id'] = doc.id;
+        return data;
+      }).toList();
+    });
+  }
+
+  /// Admin: Update feedback status
+  Future<bool> updateFeedbackStatus({
+    required String feedbackId,
+    required String status,
+    String? adminNotes,
+  }) async {
+    try {
+      final updateData = {
+        'status': status,
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+
+      if (adminNotes != null) {
+        updateData['adminNotes'] = adminNotes;
+      }
+
+      if (status == 'reviewed' || status == 'resolved') {
+        updateData['reviewedAt'] = FieldValue.serverTimestamp();
+        updateData['reviewedBy'] = _auth.currentUser?.email ?? 'admin';
+      }
+
+      await _firestore
+          .collection('user_feedback')
+          .doc(feedbackId)
+          .update(updateData);
+      return true;
+    } catch (e) {
+      print('Error updating feedback status: $e');
+      return false;
+    }
+  }
+
+  /// Submit bug report
+  Future<bool> submitBugReport({
+    required String bugDescription,
+  }) async {
+    try {
+      final currentUser = _auth.currentUser;
+      if (currentUser == null) {
+        print('User not logged in');
+        return false;
+      }
+
+      // Get user info
+      final userDoc =
+          await _firestore.collection('count').doc(currentUser.uid).get();
+
+      String userName = 'Anonymous';
+      String userEmail = currentUser.email ?? '';
+
+      if (userDoc.exists) {
+        final data = userDoc.data()!;
+        userName =
+            '${data['first_name'] ?? ''} ${data['last_name'] ?? ''}'.trim();
+        if (userName.isEmpty) userName = 'Anonymous';
+      }
+
+      // Create bug report document
+      final bugReportData = {
+        'userId': currentUser.uid,
+        'userName': userName,
+        'userEmail': userEmail,
+        'description': bugDescription,
+        'status': 'pending', // pending, investigating, resolved
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+        'adminNotes': '',
+        'resolvedAt': null,
+        'resolvedBy': null,
+      };
+
+      await _firestore.collection('bug_reports').add(bugReportData);
+      print('Bug report submitted successfully');
+      return true;
+    } catch (e) {
+      print('Error submitting bug report: $e');
+      return false;
+    }
+  }
+
+  /// Stream bug reports for admin dashboard
+  Stream<List<Map<String, dynamic>>> streamBugReports({String? status}) {
+    Query query = _firestore.collection('bug_reports');
+
+    if (status != null) {
+      query = query.where('status', isEqualTo: status);
+    }
+
+    query = query.orderBy('createdAt', descending: true);
+
+    return query.snapshots().map((snapshot) {
+      return snapshot.docs.map((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        data['id'] = doc.id;
+        return data;
+      }).toList();
+    });
+  }
+
+  /// Admin: Update bug report status
+  Future<bool> updateBugReportStatus({
+    required String bugReportId,
+    required String status,
+    String? adminNotes,
+  }) async {
+    try {
+      final updateData = {
+        'status': status,
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+
+      if (adminNotes != null) {
+        updateData['adminNotes'] = adminNotes;
+      }
+
+      if (status == 'resolved') {
+        updateData['resolvedAt'] = FieldValue.serverTimestamp();
+        updateData['resolvedBy'] = _auth.currentUser?.email ?? 'admin';
+      }
+
+      await _firestore
+          .collection('bug_reports')
+          .doc(bugReportId)
+          .update(updateData);
+      return true;
+    } catch (e) {
+      print('Error updating bug report status: $e');
+      return false;
+    }
+  }
 }

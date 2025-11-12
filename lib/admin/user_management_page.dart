@@ -553,144 +553,125 @@ class _UserManagementPageState extends State<UserManagementPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey[100],
-      appBar: AppBar(
-        title: const Row(
-          children: [
-            Icon(Icons.people, size: 28),
-            SizedBox(width: 12),
-            Text(
-              '👥 User Management',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-          ],
+    return Column(
+      children: [
+        // Search and Filter Bar
+        Container(
+          padding: const EdgeInsets.all(20),
+          color: Colors.white,
+          child: Column(
+            children: [
+              // Search Bar
+              TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  hintText: 'Search by name or email...',
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: _searchQuery.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: () {
+                            setState(() {
+                              _searchController.clear();
+                              _searchQuery = '';
+                            });
+                          },
+                        )
+                      : null,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onChanged: (value) {
+                  setState(() => _searchQuery = value.toLowerCase());
+                },
+              ),
+              const SizedBox(height: 16),
+              // Filter Chips
+              Wrap(
+                spacing: 12,
+                children: [
+                  _buildFilterChip('All Users', 'all'),
+                  _buildFilterChip('Active', 'active'),
+                  _buildFilterChip('Suspended', 'suspended'),
+                  _buildFilterChip('Deleted', 'deleted'),
+                ],
+              ),
+            ],
+          ),
         ),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black87,
-        elevation: 0,
-      ),
-      body: Column(
-        children: [
-          // Search and Filter Bar
-          Container(
-            padding: const EdgeInsets.all(20),
-            color: Colors.white,
-            child: Column(
-              children: [
-                // Search Bar
-                TextField(
-                  controller: _searchController,
-                  decoration: InputDecoration(
-                    hintText: 'Search by name or email...',
-                    prefixIcon: const Icon(Icons.search),
-                    suffixIcon: _searchQuery.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear),
-                            onPressed: () {
-                              setState(() {
-                                _searchController.clear();
-                                _searchQuery = '';
-                              });
-                            },
-                          )
-                        : null,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+
+        // Users List
+        Expanded(
+          child: StreamBuilder<QuerySnapshot>(
+            stream: _getUsersStream(),
+            builder: (context, snapshot) {
+              if (snapshot.hasError) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.error_outline,
+                          size: 64, color: Colors.red),
+                      const SizedBox(height: 16),
+                      Text('Error: ${snapshot.error}'),
+                    ],
                   ),
-                  onChanged: (value) {
-                    setState(() => _searchQuery = value.toLowerCase());
-                  },
-                ),
-                const SizedBox(height: 16),
-                // Filter Chips
-                Wrap(
-                  spacing: 12,
-                  children: [
-                    _buildFilterChip('All Users', 'all'),
-                    _buildFilterChip('Active', 'active'),
-                    _buildFilterChip('Suspended', 'suspended'),
-                    _buildFilterChip('Deleted', 'deleted'),
-                  ],
-                ),
-              ],
-            ),
-          ),
-
-          // Users List
-          Expanded(
-            child: StreamBuilder<QuerySnapshot>(
-              stream: _getUsersStream(),
-              builder: (context, snapshot) {
-                if (snapshot.hasError) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.error_outline,
-                            size: 64, color: Colors.red),
-                        const SizedBox(height: 16),
-                        Text('Error: ${snapshot.error}'),
-                      ],
-                    ),
-                  );
-                }
-
-                if (!snapshot.hasData) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-
-                var users = snapshot.data!.docs;
-
-                // Apply search filter
-                if (_searchQuery.isNotEmpty) {
-                  users = users.where((doc) {
-                    final data = doc.data() as Map<String, dynamic>;
-                    final name = (data['displayName'] ?? '').toLowerCase();
-                    final email = (data['email'] ?? '').toLowerCase();
-                    return name.contains(_searchQuery) ||
-                        email.contains(_searchQuery);
-                  }).toList();
-                }
-
-                if (users.isEmpty) {
-                  return const Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.people_outline,
-                            size: 64, color: Colors.grey),
-                        SizedBox(height: 16),
-                        Text(
-                          'No users found',
-                          style: TextStyle(fontSize: 18, color: Colors.grey),
-                        ),
-                      ],
-                    ),
-                  );
-                }
-
-                return GridView.builder(
-                  padding: const EdgeInsets.all(20),
-                  gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                    maxCrossAxisExtent: 450,
-                    childAspectRatio: 1.3,
-                    crossAxisSpacing: 16,
-                    mainAxisSpacing: 16,
-                  ),
-                  itemCount: users.length,
-                  itemBuilder: (context, index) {
-                    final user = users[index];
-                    final data = user.data() as Map<String, dynamic>;
-                    return _buildUserCard(user.id, data);
-                  },
                 );
-              },
-            ),
+              }
+
+              if (!snapshot.hasData) {
+                return const Center(child: CircularProgressIndicator());
+              }
+
+              var users = snapshot.data!.docs;
+
+              // Apply search filter
+              if (_searchQuery.isNotEmpty) {
+                users = users.where((doc) {
+                  final data = doc.data() as Map<String, dynamic>;
+                  final name = (data['displayName'] ?? '').toLowerCase();
+                  final email = (data['email'] ?? '').toLowerCase();
+                  return name.contains(_searchQuery) ||
+                      email.contains(_searchQuery);
+                }).toList();
+              }
+
+              if (users.isEmpty) {
+                return const Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.people_outline, size: 64, color: Colors.grey),
+                      SizedBox(height: 16),
+                      Text(
+                        'No users found',
+                        style: TextStyle(fontSize: 18, color: Colors.grey),
+                      ),
+                    ],
+                  ),
+                );
+              }
+
+              return GridView.builder(
+                padding: const EdgeInsets.all(20),
+                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                  maxCrossAxisExtent: 450,
+                  childAspectRatio: 1.3,
+                  crossAxisSpacing: 16,
+                  mainAxisSpacing: 16,
+                ),
+                itemCount: users.length,
+                itemBuilder: (context, index) {
+                  final user = users[index];
+                  final data = user.data() as Map<String, dynamic>;
+                  return _buildUserCard(user.id, data);
+                },
+              );
+            },
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
