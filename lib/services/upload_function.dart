@@ -56,7 +56,7 @@ class VideoUploadService {
   // Remove.bg API key for background removal
   static const String _removeBgApiKey = 'V2BJ2X9HigKJ7hFJqp8TeUNu';
 
-  //Upload multiple model images to Supabase bucket "ar_pics"
+  //Upload AR model images to Supabase bucket "ar_pics" (for AR models only)
   Future<List<String>> uploadModelImages({
     required List<File> imageFiles,
     required String userId,
@@ -388,10 +388,10 @@ class VideoUploadService {
         onProgress(0.15, 'Thumbnail uploaded');
       }
 
-      // Step 4: Upload model images if provided
+      // Step 4: Upload AR model images if provided (for AR models only)
       List<String> modelImageUrls = [];
       if (modelImages != null && modelImages.isNotEmpty) {
-        onProgress(0.18, 'Uploading model images...');
+        onProgress(0.18, 'Uploading AR model images...');
         modelImageUrls = await uploadModelImages(
           imageFiles: modelImages,
           userId: user.uid,
@@ -508,8 +508,8 @@ class VideoUploadService {
         'likes': 0,
         'tags': [],
         'isPublic': true,
-        'modelImages': modelImageUrls, //Store model image URLs
-        'has3DModel': false, // Will be updated when model is generated
+        'modelImages': modelImageUrls, //Store AR model image URLs (for reference)
+        'has3DModel': false, // 3D models are generated separately, not from upload images
         'disposalCategory': disposalCategory, // Store disposal category
         'customSteps': customSteps, // Store custom steps
       };
@@ -523,74 +523,20 @@ class VideoUploadService {
       final videoId = docRef.id;
 
       // Step 11.5: Process model images into AR models (if provided)
+      // Model images are ONLY used for AR models, not for 3D model generation
       if (modelImages != null && modelImages.isNotEmpty) {
         onProgress(0.85, 'Processing AR models...');
         await _processModelImagesIntoARModels(
           videoId: videoId,
           modelImages: modelImages,
           onProgress: (progress, status) {
-            // Scale from 0.85 to 0.95
-            onProgress(0.85 + (progress * 0.1), status);
+            // Scale from 0.85 to 1.0 (AR models are the final step)
+            onProgress(0.85 + (progress * 0.15), status);
           },
         );
       }
 
-      onProgress(0.95, 'Video upload completed!');
-
-      // Step 12: Generate 3D model automatically if model images were uploaded
-      if (modelImageUrls.isNotEmpty && modelImageUrls.length >= 3) {
-        onProgress(0.96, 'Initiating 3D model generation...');
-
-        // Check backend health before attempting generation
-        final backendHealthy = await isBackendHealthy();
-
-        if (!backendHealthy) {
-          print('Backend not available - skipping 3D generation for now');
-          await _firestore.collection('videos').doc(docRef.id).update({
-            'modelGenerationPending': true,
-            'modelGenerationError': 'Backend unavailable at upload time',
-          });
-          onProgress(0.95, 'Video uploaded (3D model pending)');
-        } else {
-          onProgress(0.94, 'Submitting to 3D model service...');
-
-          // Small delay to ensure Firestore write is propagated
-          await Future.delayed(const Duration(milliseconds: 500));
-
-          // Generate 3D model - wait for job submission (not completion)
-          try {
-            final jobSubmitted = await _submitModelGenerationJob(
-              videoId: docRef.id,
-              onStatusUpdate: (status) {
-                onProgress(0.96, status);
-              },
-            );
-
-            if (jobSubmitted) {
-              onProgress(0.98, '3D model generation queued successfully!');
-              print(
-                  '3D model generation queued for video: ${docRef.id} with ${modelImageUrls.length} images');
-            } else {
-              print('Failed to queue 3D model generation');
-              await _firestore.collection('videos').doc(docRef.id).update({
-                'modelGenerationPending': true,
-                'modelGenerationError': 'Failed to submit generation job',
-              });
-            }
-          } catch (e) {
-            print('Error submitting 3D model job: $e');
-            await _firestore.collection('videos').doc(docRef.id).update({
-              'modelGenerationPending': true,
-              'modelGenerationError': e.toString(),
-            });
-          }
-        }
-      } else {
-        print(
-            'Skipping 3D generation: Only ${modelImageUrls.length} images (need 3+)');
-      }
-
-      onProgress(1.0, 'Upload complete! 3D model processing in background...');
+      onProgress(1.0, 'Video upload completed! AR models ready.');
 
       // Send notification to followers about new video (asynchronously)
       _sendNewVideoNotificationAsync(
@@ -610,50 +556,6 @@ class VideoUploadService {
     }
   }
 
-  // Submit 3D model generation job (waits for job submission, not completion)
-  Future<bool> _submitModelGenerationJob({
-    required String videoId,
-    required Function(String status) onStatusUpdate,
-  }) async {
-    try {
-      onStatusUpdate('Submitting 3D generation request...');
-      print('Submitting 3D generation job for video: $videoId');
-
-      final user = _auth.currentUser;
-      if (user == null) {
-        throw Exception('User not authenticated');
-      }
-
-      final response = await http
-          .post(
-            Uri.parse('$_backendUrl/api/generate-3d'),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({
-              'video_id': videoId,
-              'user_id': user.uid,
-            }),
-          )
-          .timeout(const Duration(seconds: 30));
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final taskId = data['task_id'];
-
-        onStatusUpdate('3D model job submitted (ID: $taskId)');
-        print('Job submitted successfully: $taskId');
-        print('   Auto-fetch worker will complete the model in 5-10 minutes');
-
-        return true;
-      } else {
-        print('Failed to submit job: ${response.statusCode}');
-        print('   Response: ${response.body}');
-        return false;
-      }
-    } catch (e) {
-      print('Error submitting 3D model job: $e');
-      return false;
-    }
-  }
 
   //Send notification to followers asynchronously (non-blocking)
   Future<void> _sendNewVideoNotificationAsync({
@@ -751,6 +653,72 @@ class VideoUploadService {
     } catch (e) {
       print('Error getting model status: $e');
       return {'exists': false, 'error': e.toString()};
+    }
+  }
+
+  //Fetch uploaded models from backend storage
+  /// Fetches all uploaded models from the backend storage
+  /// This calls the backend API to get models that are actually stored in Supabase
+  Future<List<Map<String, dynamic>>> fetchUploadedModelsFromStorage({
+    String? userId,
+    String? videoId,
+  }) async {
+    try {
+      print('Fetching uploaded models from backend storage...');
+      
+      // Build query parameters
+      final queryParams = <String, String>{};
+      if (userId != null) {
+        queryParams['user_id'] = userId;
+      }
+      if (videoId != null) {
+        queryParams['video_id'] = videoId;
+      }
+
+      final uri = Uri.parse('$_backendUrl/api/models/list')
+          .replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
+
+      print('Calling backend API: $uri');
+
+      final response = await http
+          .get(uri)
+          .timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          throw Exception('Backend connection timeout while fetching models');
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        
+        // Handle different response formats
+        List<Map<String, dynamic>> models = [];
+        if (data is List) {
+          models = List<Map<String, dynamic>>.from(data);
+        } else if (data is Map && data.containsKey('models')) {
+          models = List<Map<String, dynamic>>.from(data['models']);
+        } else if (data is Map && data.containsKey('data')) {
+          models = List<Map<String, dynamic>>.from(data['data']);
+        } else {
+          print('Unexpected response format from backend: $data');
+          return [];
+        }
+
+        print('Successfully fetched ${models.length} models from backend storage');
+        return models;
+      } else {
+        print('Backend returned error status: ${response.statusCode}');
+        print('Response body: ${response.body}');
+        throw Exception('Failed to fetch models: ${response.statusCode} - ${response.body}');
+      }
+    } on http.ClientException catch (e) {
+      final errorMsg = 'Cannot connect to backend at $_backendUrl. Is it running? Error: $e';
+      print(errorMsg);
+      return [];
+    } catch (e) {
+      print('Error fetching uploaded models from storage: $e');
+      return [];
     }
   }
 

@@ -31,7 +31,7 @@ class AboutUsContent {
       icon: '🥽',
       title: 'Augmented Reality',
       description:
-          'Experience interactive 3D models of recyclable items in AR. '
+          'Experience interactive 2D models of recyclable items in AR. '
           'Learn how materials are processed and understand their environmental impact.',
     ),
     Feature(
@@ -63,13 +63,13 @@ class AboutUsContent {
     ),
   ];
 
-  static const String developedBy = 'ReXplore Development Team';
+  static const String developedBy = 'Rexplore Team';
 
   static const String version = '1.0.0';
 
   static const String copyright = '© 2025 ReXplore. All rights reserved.';
 
-  static const String contactEmail = 'support@rexplore.app';
+  static const String contactEmail = 'rexplore@gmail.com';
 
   static const List<String> technologies = [
     'Flutter',

@@ -99,6 +99,9 @@ class ARModelService {
   }
 
   /// Get all AR models for a specific video
+  /// Returns all active models for the video - visible to ALL users (not just uploader)
+  /// Flow: User uploader → Fill details → Image uploaded to Supabase → 
+  ///       Firebase gets URL → Firebase stores metadata → Models displayed for video → All users see models
   Stream<List<Map<String, dynamic>>> getVideoARModels(String videoId) {
     return _firestore
         .collection('videos')

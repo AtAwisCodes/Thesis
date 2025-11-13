@@ -41,6 +41,9 @@ class _VideoARScannerPageState extends State<VideoARScannerPage>
   List<Map<String, dynamic>> _availableModels = [];
   bool _isLoadingModels = true;
   String? _selectedModelId;
+  // Track initial scale and position for pinch/pan gestures
+  Map<int, double> _initialScales = {};
+  Map<int, Offset> _initialPositions = {};
 
   final ARModelService _arModelService = ARModelService();
 
@@ -305,10 +308,27 @@ class _VideoARScannerPageState extends State<VideoARScannerPage>
             _selectedPlacementPosition = null; // Clear placement position
           });
         },
-        onPanUpdate: (details) {
+        onScaleStart: (details) {
+          // Store initial scale and position when gesture starts
+          _initialScales[obj.id] = obj.scale;
+          _initialPositions[obj.id] = obj.position;
+        },
+        onScaleUpdate: (details) {
           setState(() {
-            obj.position += details.delta;
+            final initialScale = _initialScales[obj.id] ?? obj.scale;
+            final initialPosition = _initialPositions[obj.id] ?? obj.position;
+            
+            // Handle scaling (pinch gesture)
+            obj.scale = (initialScale * details.scale).clamp(0.5, 3.0);
+            
+            // Handle panning (drag gesture) - focalPointDelta works for both single and multi-touch
+            obj.position = initialPosition + details.focalPointDelta;
           });
+        },
+        onScaleEnd: (details) {
+          // Clear initial scale and position tracking
+          _initialScales.remove(obj.id);
+          _initialPositions.remove(obj.id);
         },
         child: Transform.rotate(
           angle: obj.rotation,

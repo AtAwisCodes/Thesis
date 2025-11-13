@@ -16,7 +16,6 @@ import 'package:rexplore/pages/settings_page.dart';
 import 'package:rexplore/services/auth_service.dart';
 import 'package:rexplore/viewmodel/yt_videoview_model.dart';
 import 'package:rexplore/utilities/responsive_helper.dart';
-import 'package:rexplore/augmented_reality/ar_scanner_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -190,21 +189,6 @@ class _HomePageState extends State<HomePage> {
                         child: ListView(
                           padding: EdgeInsets.zero,
                           children: [
-                            ListTile(
-                              leading: const Icon(Icons.view_in_ar, color: Colors.green),
-                              title: const Text('AR Scanner'),
-                              subtitle: const Text('Augmented Reality Camera'),
-                              onTap: () {
-                                Navigator.pop(context);
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => const ARScannerPage(),
-                                  ),
-                                );
-                              },
-                            ),
-                            const Divider(),
                             ListTile(
                               leading: const Icon(Icons.settings),
                               title: const Text('Settings'),

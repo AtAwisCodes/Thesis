@@ -1,7 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:rexplore/services/upload_function.dart';
 
 /// Service to access 3D models directly from Firestore
 /// This bypasses the backend for model retrieval, allowing access from any network
+/// Also supports fetching from backend storage when needed
 class FirestoreModelService {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
@@ -202,5 +204,100 @@ class FirestoreModelService {
       print('Firestore health check failed: $e');
       return false;
     }
+  }
+
+  /// Fetch models from backend storage
+  /// This calls the backend API to get models that are actually stored in Supabase storage
+  /// Falls back to Firestore if backend is unavailable
+  static Future<List<Map<String, dynamic>>> fetchModelsFromBackendStorage({
+    String? userId,
+    String? videoId,
+    bool fallbackToFirestore = true,
+  }) async {
+    try {
+      final uploadService = VideoUploadService();
+      final models = await uploadService.fetchUploadedModelsFromStorage(
+        userId: userId,
+        videoId: videoId,
+      );
+
+      if (models.isNotEmpty) {
+        print(
+            'Successfully fetched ${models.length} models from backend storage');
+        return models;
+      } else if (fallbackToFirestore) {
+        print('No models from backend, falling back to Firestore...');
+        if (videoId != null) {
+          return await getModelsForVideo(videoId);
+        } else {
+          return await listAllModels(userId: userId);
+        }
+      }
+      return [];
+    } catch (e) {
+      print('Error fetching models from backend storage: $e');
+      if (fallbackToFirestore) {
+        print('Falling back to Firestore...');
+        try {
+          if (videoId != null) {
+            return await getModelsForVideo(videoId);
+          } else {
+            return await listAllModels(userId: userId);
+          }
+        } catch (firestoreError) {
+          print('Firestore fallback also failed: $firestoreError');
+          return [];
+        }
+      }
+      return [];
+    }
+  }
+
+  /// Get models for a video, trying backend storage first, then Firestore
+  /// This is the recommended method to fetch models as it checks both sources
+  static Future<List<Map<String, dynamic>>> getModelsForVideoWithBackend(
+    String videoId, {
+    bool tryBackendFirst = true,
+  }) async {
+    if (tryBackendFirst) {
+      try {
+        final backendModels = await fetchModelsFromBackendStorage(
+          videoId: videoId,
+          fallbackToFirestore: true,
+        );
+        if (backendModels.isNotEmpty) {
+          return backendModels;
+        }
+      } catch (e) {
+        print('Backend fetch failed, using Firestore: $e');
+      }
+    }
+
+    // Fallback to Firestore
+    return await getModelsForVideo(videoId);
+  }
+
+  /// List all models, trying backend storage first, then Firestore
+  /// This is the recommended method to list models as it checks both sources
+  static Future<List<Map<String, dynamic>>> listAllModelsWithBackend({
+    String? userId,
+    bool tryBackendFirst = true,
+  }) async {
+    if (tryBackendFirst) {
+      try {
+        final backendModels = await fetchModelsFromBackendStorage(
+          userId: userId,
+          fallbackToFirestore: true,
+        );
+        if (backendModels.isNotEmpty) {
+          return backendModels;
+        }
+      } catch (e) {
+        print('Backend fetch failed, using Firestore: $e');
+      }
+    }
+
+    // Fallback to Firestore
+    return await listAllModels(userId: userId);
   }
 }

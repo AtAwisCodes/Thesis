@@ -60,7 +60,7 @@ void main() async {
     },
     (error, stack) {
       // Log WebView and other crashes
-      print('💥 App Error Caught: $error');
+      print('App Error Caught: $error');
       print('Stack trace: $stack');
     },
   );
