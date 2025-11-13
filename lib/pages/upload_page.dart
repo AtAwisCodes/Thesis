@@ -503,25 +503,18 @@ class _VideoDetailsScreenState extends State<VideoDetailsScreen> {
 
   Future<void> _pickImages() async {
     try {
-      final List<XFile> images = await _picker.pickMultiImage();
+      // Pick only 1 image
+      final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
 
-      if (images.isEmpty) return;
+      if (image == null) return;
 
-      final totalCount = _selectedImages.length + images.length;
-      if (totalCount > 4) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("You can only upload up to 4 images."),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
-        return;
-      }
       setState(() {
-        _selectedImages.addAll(images);
+        // Replace existing image with new one (only 1 image allowed)
+        _selectedImages.clear();
+        _selectedImages.add(image);
       });
     } catch (e) {
-      _showError("Error picking images: $e");
+      _showError("Error picking image: $e");
     }
   }
 
@@ -1119,7 +1112,7 @@ class _VideoDetailsScreenState extends State<VideoDetailsScreen> {
                   children: [
                     Expanded(
                       child: Text(
-                        "Formats: .png, .jpg, .jpeg, .webp (3–4 images, 20MB Max)",
+                        "Formats: .png, .jpg, .jpeg, .webp (1 image, 20MB Max)",
                         style: TextStyle(
                           color: theme.hintColor,
                           fontSize: 14,
@@ -1269,8 +1262,8 @@ class _VideoDetailsScreenState extends State<VideoDetailsScreen> {
       return;
     }
 
-    if (_selectedImages.length < 3) {
-      _showError("Please select at least 3 images before uploading.");
+    if (_selectedImages.isEmpty) {
+      _showError("Please select 1 model image before uploading.");
       return;
     }
 

@@ -6,7 +6,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:path_provider/path_provider.dart';
 import 'notification_service.dart';
+import 'ar_model_service.dart';
 
 class VideoUploadResult {
   final bool success;
@@ -46,9 +48,13 @@ class VideoUploadService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final Uuid _uuid = const Uuid();
   final NotificationService _notificationService = NotificationService();
+  final ARModelService _arModelService = ARModelService();
 
   //DITO MO LAGAY IP MO LANS YESHUA DE GUZMAN
   static const String _backendUrl = 'http://192.168.100.25:5000';
+  
+  // Remove.bg API key for background removal
+  static const String _removeBgApiKey = 'V2BJ2X9HigKJ7hFJqp8TeUNu';
 
   //Upload multiple model images to Supabase bucket "ar_pics"
   Future<List<String>> uploadModelImages({
@@ -514,12 +520,26 @@ class VideoUploadService {
 
       // Step 11: Add videoId field
       await docRef.update({'videoId': docRef.id});
+      final videoId = docRef.id;
 
-      onProgress(0.9, 'Video upload completed!');
+      // Step 11.5: Process model images into AR models (if provided)
+      if (modelImages != null && modelImages.isNotEmpty) {
+        onProgress(0.85, 'Processing AR models...');
+        await _processModelImagesIntoARModels(
+          videoId: videoId,
+          modelImages: modelImages,
+          onProgress: (progress, status) {
+            // Scale from 0.85 to 0.95
+            onProgress(0.85 + (progress * 0.1), status);
+          },
+        );
+      }
+
+      onProgress(0.95, 'Video upload completed!');
 
       // Step 12: Generate 3D model automatically if model images were uploaded
       if (modelImageUrls.isNotEmpty && modelImageUrls.length >= 3) {
-        onProgress(0.92, 'Initiating 3D model generation...');
+        onProgress(0.96, 'Initiating 3D model generation...');
 
         // Check backend health before attempting generation
         final backendHealthy = await isBackendHealthy();
@@ -819,6 +839,105 @@ class VideoUploadService {
     } catch (e) {
       print('Update error: $e');
       return false;
+    }
+  }
+
+  /// Remove background from image using remove.bg API
+  Future<File?> _removeBackground(File imageFile) async {
+    try {
+      final request = http.MultipartRequest(
+        'POST',
+        Uri.parse('https://api.remove.bg/v1.0/removebg'),
+      );
+
+      request.headers['X-Api-Key'] = _removeBgApiKey;
+      request.files.add(await http.MultipartFile.fromPath('image_file', imageFile.path));
+      request.fields['size'] = 'auto';
+
+      final response = await request.send();
+
+      if (response.statusCode == 200) {
+        final bytes = await response.stream.toBytes();
+        final tempDir = await getTemporaryDirectory();
+        final timestamp = DateTime.now().millisecondsSinceEpoch;
+        final fileName = 'ar_model_$timestamp.png';
+        final outputPath = path.join(tempDir.path, fileName);
+        final outputFile = File(outputPath);
+        await outputFile.writeAsBytes(bytes);
+        return outputFile;
+      } else {
+        print('Background removal failed: ${response.statusCode}');
+        return null;
+      }
+    } catch (e) {
+      print('Error removing background: $e');
+      return null;
+    }
+  }
+
+  /// Process model images into AR models during video upload
+  /// This creates AR models with background removal, uploads to Supabase, and saves to Firestore
+  Future<void> _processModelImagesIntoARModels({
+    required String videoId,
+    required List<File> modelImages,
+    required Function(double progress, String status) onProgress,
+  }) async {
+    try {
+      if (modelImages.isEmpty) return;
+
+      final totalImages = modelImages.length;
+      double step = 1.0 / totalImages;
+      double currentProgress = 0.0;
+
+      for (int i = 0; i < totalImages; i++) {
+        final imageFile = modelImages[i];
+        
+        onProgress(
+          currentProgress,
+          'Processing AR model ${i + 1}/$totalImages (removing background)...',
+        );
+
+        // Step 1: Remove background
+        final processedFile = await _removeBackground(imageFile);
+        
+        if (processedFile == null) {
+          print('Failed to remove background for image ${i + 1}, skipping...');
+          currentProgress += step;
+          continue;
+        }
+
+        onProgress(
+          currentProgress + (step * 0.3),
+          'Processing AR model ${i + 1}/$totalImages (uploading)...',
+        );
+
+        // Step 2: Upload to AR models (using ARModelService)
+        // Generate model name based on index
+        final modelName = 'Model ${i + 1}';
+        
+        final result = await _arModelService.uploadARModel(
+          videoId: videoId,
+          imageFile: processedFile,
+          modelName: modelName,
+        );
+
+        if (result != null) {
+          print('AR model ${i + 1} created successfully: ${result['modelId']}');
+        } else {
+          print('Failed to create AR model ${i + 1}');
+        }
+
+        currentProgress += step;
+        onProgress(
+          currentProgress,
+          'AR model ${i + 1}/$totalImages completed',
+        );
+      }
+
+      onProgress(1.0, 'All AR models processed successfully');
+    } catch (e) {
+      print('Error processing model images into AR models: $e');
+      // Don't throw - allow video upload to complete even if AR processing fails
     }
   }
 

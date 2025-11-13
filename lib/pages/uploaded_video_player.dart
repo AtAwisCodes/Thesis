@@ -3,7 +3,8 @@ import 'package:rexplore/components/fullscreen_helper.dart';
 import 'package:rexplore/components/expandable_details.dart';
 import 'package:video_player/video_player.dart';
 import 'package:rexplore/services/favorites_manager.dart';
-import 'package:rexplore/augmented_reality/augmented_camera.dart';
+import 'package:rexplore/augmented_reality/video_ar_scanner_page.dart';
+import 'package:rexplore/augmented_reality/ar_model_manager_page.dart';
 import 'package:rexplore/services/upload_function.dart';
 import 'package:rexplore/services/follow_service.dart';
 import 'package:rexplore/services/notification_service.dart';
@@ -58,9 +59,6 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
   bool isDisliked = false;
   int _likeCount = 0;
   bool _isFavorited = false;
-  bool _has3DModel = false;
-  bool _isCheckingModel = true;
-  String? _modelError;
   bool _isLoadingComments = true;
   int _viewCount = 0;
   String? _uploaderUserId;
@@ -106,9 +104,6 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
 
     // Fetch like count
     _fetchLikeCount();
-
-    // Check 3D model status
-    _check3DModelStatus();
 
     // Load comments
     _loadComments();
@@ -241,43 +236,6 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
       }
     } catch (e) {
       print('Error fetching like count: $e');
-    }
-  }
-
-  Future<void> _check3DModelStatus() async {
-    try {
-      final status = await _uploadService.getModelStatus(widget.videoId);
-
-      if (mounted) {
-        setState(() {
-          _has3DModel = status['has3DModel'] ?? false;
-          _modelError = status['modelGenerationError'];
-          _isCheckingModel = false;
-        });
-
-        // Show success notification if model is ready
-        if (_has3DModel && mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Row(
-                children: [
-                  Icon(Icons.check_circle, color: Colors.white),
-                  SizedBox(width: 8),
-                  Text('3D Model Ready! Tap "View in AR" to explore'),
-                ],
-              ),
-              backgroundColor: Colors.green,
-              duration: Duration(seconds: 3),
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isCheckingModel = false;
-        });
-      }
     }
   }
 
@@ -558,20 +516,6 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
     _controller.dispose();
     _commentController.dispose();
     super.dispose();
-  }
-
-  //Meshy AR Camera with videoId
-  Future<void> _openARCamera() async {
-    if (mounted) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => MeshyARCamera(
-            videoId: widget.videoId,
-          ),
-        ),
-      );
-    }
   }
 
   void _enterFullscreen() {
@@ -1427,6 +1371,25 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
         backgroundColor: Colors.transparent,
         automaticallyImplyLeading: false,
         actions: [
+          // AR Model Manager button (only for video uploader)
+          if (_uploaderUserId != null &&
+              _auth.currentUser?.uid == _uploaderUserId)
+            IconButton(
+              icon: const Icon(Icons.view_in_ar),
+              color: Colors.green[700],
+              tooltip: 'Manage AR Models',
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => ARModelManagerPage(
+                      videoId: widget.videoId,
+                      videoTitle: widget.title,
+                    ),
+                  ),
+                );
+              },
+            ),
           // Report button
           IconButton(
             icon: const Icon(Icons.flag_outlined),
@@ -1977,99 +1940,24 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
         },
       ),
 
-      // Updated Floating Action Button with Model Status
-      floatingActionButton: _buildARButton(),
-    );
-  }
-
-  Widget _buildARButton() {
-    if (_isCheckingModel) {
-      return FloatingActionButton.extended(
-        onPressed: null,
-        backgroundColor: Colors.grey,
-        icon: const SizedBox(
-          width: 20,
-          height: 20,
-          child: CircularProgressIndicator(
-            strokeWidth: 2,
-            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-          ),
-        ),
-        label: const Text(
-          "Checking...",
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-      );
-    }
-
-    if (_has3DModel) {
-      return FloatingActionButton.extended(
-        onPressed: _openARCamera,
-        backgroundColor: const Color(0xff5BEC84),
-        icon: const Icon(Icons.view_in_ar, color: Colors.black),
-        label: const Text(
-          "View in AR",
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Colors.black,
-          ),
-        ),
-      );
-    }
-
-    if (_modelError != null) {
-      return FloatingActionButton.extended(
+      // AR Scanner Floating Action Button
+      floatingActionButton: FloatingActionButton(
         onPressed: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('3D Model Error: $_modelError'),
-              backgroundColor: Colors.red,
-              action: SnackBarAction(
-                label: 'Retry',
-                textColor: Colors.white,
-                onPressed: () {
-                  // TODO: Implement retry logic
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Retry feature coming soon!'),
-                    ),
-                  );
-                },
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => VideoARScannerPage(
+                videoId: widget.videoId,
+                videoTitle: widget.title,
               ),
             ),
           );
         },
-        backgroundColor: Colors.red,
-        icon: const Icon(Icons.error_outline, color: Colors.white),
-        label: const Text(
-          "Model Failed",
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-      );
-    }
-
-    return FloatingActionButton.extended(
-      onPressed: () {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No 3D model available for this video'),
-            backgroundColor: Colors.orange,
-          ),
-        );
-      },
-      backgroundColor: Colors.orange,
-      icon: const Icon(Icons.block, color: Colors.white),
-      label: const Text(
-        "No Model",
-        style: TextStyle(
-          fontWeight: FontWeight.bold,
+        backgroundColor: Colors.green,
+        child: const Icon(
+          Icons.view_in_ar,
           color: Colors.white,
+          size: 28,
         ),
       ),
     );

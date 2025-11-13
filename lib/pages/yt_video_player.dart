@@ -6,6 +6,7 @@ import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:rexplore/services/favorites_manager.dart';
 import 'package:rexplore/services/video_history_service.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:rexplore/augmented_reality/video_ar_scanner_page.dart';
 
 class YtVideoPlayer extends StatefulWidget {
   final String videoId;
@@ -180,19 +181,6 @@ class _YtVideoPlayerState extends State<YtVideoPlayer> {
 
     _controller.dispose();
     super.dispose();
-  }
-
-  Future<void> _openCamera() async {
-    // Show message that YouTube videos don't have AR models
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text(
-          'AR features are only available for user-uploaded videos. YouTube videos do not have 3D models.',
-        ),
-        duration: const Duration(seconds: 4),
-        backgroundColor: Colors.orange,
-      ),
-    );
   }
 
   /// Open YouTube video page in browser
@@ -925,17 +913,24 @@ class _YtVideoPlayerState extends State<YtVideoPlayer> {
         ),
       ),
 
-      // AR Button - YouTube videos don't have AR models
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _openCamera,
-        backgroundColor: Colors.orange,
-        icon: const Icon(Icons.block, color: Colors.white),
-        label: const Text(
-          "No Model",
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
+      // AR Scanner Floating Action Button
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => VideoARScannerPage(
+                videoId: widget.videoId,
+                videoTitle: widget.videoTitle,
+              ),
+            ),
+          );
+        },
+        backgroundColor: Colors.green,
+        child: const Icon(
+          Icons.view_in_ar,
+          color: Colors.white,
+          size: 28,
         ),
       ),
     );
