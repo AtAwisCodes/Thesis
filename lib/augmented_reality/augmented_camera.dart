@@ -11,7 +11,6 @@ import 'package:ar_flutter_plugin_2/models/ar_hittest_result.dart';
 import 'package:ar_flutter_plugin_2/models/ar_anchor.dart';
 import 'package:vector_math/vector_math_64.dart' as vector;
 import 'package:device_info_plus/device_info_plus.dart';
-import 'package:rexplore/services/meshy_api_service.dart';
 import 'package:rexplore/services/firestore_model_service.dart';
 import 'package:http/http.dart' as http;
 import 'dart:io';
@@ -41,11 +40,9 @@ class _MeshyARCameraState extends State<MeshyARCamera> {
   String _deviceInfo = "";
   String _statusMessage = "Checking device compatibility...";
 
-  // Meshy AI model data
+  // Model data
   List<Map<String, dynamic>> _availableModels = [];
   String? _selectedModelUrl;
-  String? _currentTaskId;
-// Local path to downloaded GLB file
 
   @override
   void initState() {
@@ -113,103 +110,6 @@ class _MeshyARCameraState extends State<MeshyARCamera> {
       setState(() {
         _isLoadingModel = false;
         _statusMessage = "Error loading models: $e";
-      });
-    }
-  }
-
-  // Generate 3D model from video images via backend
-  Future<void> _generateModelFromVideo(String videoId) async {
-    try {
-      setState(() {
-        _isLoadingModel = true;
-        _statusMessage = "Requesting 3D model generation...";
-      });
-
-      // Use the service to generate the model
-      final result = await MeshyApiService.generateModel(
-        videoId: videoId,
-        userId:
-            'current_user_id', // Replace with actual user ID from Firebase Auth
-      );
-
-      _currentTaskId = result['task_id'];
-
-      setState(() {
-        _statusMessage = "Model generation started. Task ID: $_currentTaskId";
-      });
-
-      // Start streaming status updates
-      await _streamModelStatus(_currentTaskId!);
-    } catch (e) {
-      debugPrint("Error generating model: $e");
-      setState(() {
-        _isLoadingModel = false;
-        _statusMessage = "Error: $e";
-      });
-    }
-  }
-
-  // Stream model status updates in real-time
-  Future<void> _streamModelStatus(String taskId) async {
-    try {
-      await for (final update in MeshyApiService.streamModelStatus(taskId)) {
-        if (update.containsKey('error')) {
-          setState(() {
-            _isLoadingModel = false;
-            _statusMessage = "Error: ${update['error']}";
-          });
-          break;
-        }
-
-        final status = update['status'];
-        final progress = update['progress'] ?? 0;
-
-        setState(() {
-          _statusMessage = "Model status: $status ($progress%)";
-        });
-
-        if (status == 'SUCCEEDED') {
-          await _fetchGeneratedModel(taskId);
-          break;
-        } else if (status == 'FAILED' || status == 'CANCELED') {
-          setState(() {
-            _isLoadingModel = false;
-            _statusMessage = "Model generation $status";
-          });
-          break;
-        }
-      }
-    } catch (e) {
-      debugPrint("Error streaming status: $e");
-      setState(() {
-        _isLoadingModel = false;
-        _statusMessage = "Error checking status: $e";
-      });
-    }
-  }
-
-  // Fetch the generated model from backend
-  Future<void> _fetchGeneratedModel(String taskId) async {
-    try {
-      final result = await MeshyApiService.fetchCompletedModel(
-        taskId: taskId,
-        userId:
-            'current_user_id', // Replace with actual user ID from Firebase Auth
-      );
-
-      setState(() {
-        _selectedModelUrl = result['model_public_url'];
-        _isLoadingModel = false;
-        _statusMessage = "Model ready! Tap to place in AR";
-      });
-
-      // Refresh the available models list
-      await _loadAvailableModels();
-    } catch (e) {
-      debugPrint("Error fetching model: $e");
-      setState(() {
-        _isLoadingModel = false;
-        _statusMessage = "Error: $e";
       });
     }
   }
@@ -423,18 +323,7 @@ class _MeshyARCameraState extends State<MeshyARCamera> {
                   },
                 ),
 
-              if (_availableModels.isEmpty)
-                ListTile(
-                  leading: Icon(Icons.add_circle, color: Colors.green),
-                  title: Text('Generate from current video'),
-                  onTap: () {
-                    Navigator.pop(context);
-                    if (widget.videoId != null) {
-                      _generateModelFromVideo(widget.videoId!);
-                    }
-                  },
-                )
-              else
+              if (_availableModels.isNotEmpty)
                 Expanded(
                   child: ListView.builder(
                     shrinkWrap: true,
@@ -587,7 +476,7 @@ class _MeshyARCameraState extends State<MeshyARCamera> {
     }
   }
 
-  // Get optimal scale based on file size (Meshy AI optimization)
+  // Get optimal scale based on file size
   double _getOptimalScale(int fileSizeBytes) {
     final double sizeMB = fileSizeBytes / (1024 * 1024);
 
@@ -658,7 +547,7 @@ class _MeshyARCameraState extends State<MeshyARCamera> {
     debugPrint("Hit position: ${hit.worldTransform.getColumn(3)}");
 
     setState(() {
-      _statusMessage = "Placing Meshy AI model...";
+      _statusMessage = "Placing 3D model...";
     });
 
     try {
@@ -685,7 +574,7 @@ class _MeshyARCameraState extends State<MeshyARCamera> {
       final fileSize = await File(localModelPath).length();
       final optimalScale = _getOptimalScale(fileSize);
 
-      debugPrint("Meshy AI Model Optimization:");
+      debugPrint("Model Optimization:");
       debugPrint(
           "  - File size: ${(fileSize / (1024 * 1024)).toStringAsFixed(2)} MB");
       debugPrint("  - Optimal scale: $optimalScale");
@@ -703,7 +592,7 @@ class _MeshyARCameraState extends State<MeshyARCamera> {
         final double scaleValue = optimalScale.isFinite ? optimalScale : 0.5;
         debugPrint("  - Final scale value: $scaleValue");
 
-        // Create AR node optimized for Meshy AI GLB models
+        // Create AR node for GLB models
         ARNode node = ARNode(
           type: NodeType.webGLB,
           uri:
@@ -717,7 +606,7 @@ class _MeshyARCameraState extends State<MeshyARCamera> {
           rotation: vector.Vector4(0, 0, 0, 1),
         );
 
-        debugPrint("Meshy AI Model AR Configuration:");
+        debugPrint("Model AR Configuration:");
         debugPrint("  - Plugin: ar_flutter_plugin_2 v0.0.3");
         debugPrint("  - Format: GLB (Binary GLTF)");
         debugPrint("  - Features: PBR materials, optimized mesh");
