@@ -151,6 +151,39 @@ class DisposalGuideService {
       funFact:
           'It takes 2,700 liters of water to make one cotton t-shirt - that\'s enough drinking water for one person for 2.5 years!',
     ),
+    DisposalCategory.glass: DisposalInfo(
+      category: DisposalCategory.glass,
+      title: 'How to Properly Dispose Glass',
+      description:
+          'Glass is 100% recyclable and can be recycled endlessly without loss in quality or purity. It\'s one of the most sustainable packaging materials available.',
+      steps: [
+        'Rinse the glass container to remove any residue',
+        'Remove caps, lids, and corks (recycle metal lids separately)',
+        'Check if labels need to be removed (most facilities accept them)',
+        'Separate glass by color if required by your local program',
+        'Place in designated glass recycling bin or container',
+      ],
+      dosList: [
+        'Rinse bottles and jars before recycling',
+        'Recycle clear, green, and brown glass',
+        'Include wine bottles, beer bottles, and food jars',
+        'Remove metal lids and caps',
+        'Keep glass separate from other recyclables',
+        'Take broken glass to proper recycling facilities',
+      ],
+      dontsList: [
+        'Don\'t include window glass or mirrors',
+        'Don\'t recycle light bulbs with regular glass',
+        'Don\'t include ceramic or pottery items',
+        'Don\'t mix broken glass with regular recycling',
+        'Don\'t recycle heat-resistant glass (Pyrex)',
+        'Don\'t include drinking glasses or crystal',
+      ],
+      environmentalImpact:
+          'Recycling one glass bottle saves enough energy to power a computer for 25 minutes. Glass recycling reduces air pollution by 20% and water pollution by 50%. It takes 1 million years for glass to decompose in a landfill!',
+      funFact:
+          'Glass can be recycled forever without losing quality, and recycled glass melts at a lower temperature, saving energy in production!',
+    ),
   };
 
   /// Get disposal information for a specific category

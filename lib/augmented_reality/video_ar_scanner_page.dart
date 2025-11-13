@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:camera/camera.dart';
+import 'dart:async';
 import 'dart:math' as math;
 import 'package:http/http.dart' as http;
 import 'package:image/image.dart' as img;
 import 'package:rexplore/services/ar_model_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
+import 'package:rexplore/debug/ar_model_debugger.dart';
 
 /// Video-Specific AR Scanner Page
 ///
@@ -45,8 +49,14 @@ class _VideoARScannerPageState extends State<VideoARScannerPage>
   // Track initial scale and position for pinch/pan gestures
   Map<int, double> _initialScales = {};
   Map<int, Offset> _initialPositions = {};
+  Map<int, Offset> _initialFocalPoints = {};
 
+  // Stream subscription for AR models - CRITICAL for proper cleanup
+  StreamSubscription<List<Map<String, dynamic>>>? _modelsSubscription;
   final ARModelService _arModelService = ARModelService();
+
+  // Cache key for local persistence
+  String get _cacheKey => 'ar_models_${widget.videoId}';
 
   @override
   void initState() {
@@ -116,39 +126,115 @@ class _VideoARScannerPageState extends State<VideoARScannerPage>
     try {
       print('🔍 Loading AR models for video: ${widget.videoId}');
 
-      _arModelService.getVideoARModels(widget.videoId).listen(
-        (models) {
+      // DIAGNOSTIC: Run debugger to check what's in Firestore
+      await ARModelDebugger.debugVideoARModels(widget.videoId);
+
+      // Step 1: Load cached models immediately (offline-first)
+      await _loadCachedModels();
+
+      // Step 2: Cancel any existing subscription to prevent duplicates
+      await _modelsSubscription?.cancel();
+
+      // Step 3: Subscribe to live updates from Firestore
+      print('📡 Subscribing to AR model stream...');
+      _modelsSubscription =
+          _arModelService.getVideoARModels(widget.videoId).listen(
+        (models) async {
           if (mounted) {
-            print('✅ Loaded ${models.length} AR models successfully');
+            print('✅ Loaded ${models.length} AR models from Firestore');
             if (models.isNotEmpty) {
               print(
                   '📦 First model: ${models[0]['modelName']} - ${models[0]['imageUrl']}');
+            } else {
+              print('⚠️ Stream returned ZERO models');
+              print('   → Check if models exist in Firestore');
+              print('   → Check Firestore security rules');
+              print('   → Check if models are marked as active');
             }
+
+            // Update UI with fresh data
             setState(() {
               _availableModels = models;
               _isLoadingModels = false;
               _modelLoadError = null;
             });
+
+            // Save to cache for offline access
+            await _cacheModels(models);
           }
         },
         onError: (error) {
-          print('❌ Error loading AR models: $error');
+          print('❌ Error loading AR models from Firestore: $error');
           if (mounted) {
             setState(() {
               _isLoadingModels = false;
-              _modelLoadError = error.toString();
+              // Only show error if we don't have cached models
+              if (_availableModels.isEmpty) {
+                _modelLoadError = 'Failed to load models: ${error.toString()}';
+              } else {
+                _modelLoadError = null; // Use cached models
+                print('⚠️ Using cached models due to Firestore error');
+              }
             });
           }
         },
+        cancelOnError: false, // Keep subscription alive even after errors
       );
+
+      print('✅ Stream subscription created successfully');
     } catch (e) {
       print('❌ Exception in _loadARModels: $e');
       if (mounted) {
         setState(() {
           _isLoadingModels = false;
-          _modelLoadError = e.toString();
+          // Only show error if we don't have cached models
+          if (_availableModels.isEmpty) {
+            _modelLoadError = 'Exception: ${e.toString()}';
+          } else {
+            print('⚠️ Using cached models due to exception');
+          }
         });
       }
+    }
+  }
+
+  /// Load models from local cache (instant, offline-first)
+  Future<void> _loadCachedModels() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cachedJson = prefs.getString(_cacheKey);
+
+      if (cachedJson != null) {
+        final List<dynamic> decoded = jsonDecode(cachedJson);
+        final cachedModels =
+            decoded.map((item) => Map<String, dynamic>.from(item)).toList();
+
+        if (cachedModels.isNotEmpty) {
+          print('📦 Loaded ${cachedModels.length} cached AR models');
+          setState(() {
+            _availableModels = cachedModels;
+            _isLoadingModels = false;
+          });
+        }
+      } else {
+        print('ℹ️ No cached AR models found');
+      }
+    } catch (e) {
+      print('⚠️ Error loading cached models: $e');
+      // Don't throw - cache is optional
+    }
+  }
+
+  /// Save models to local cache for offline access
+  Future<void> _cacheModels(List<Map<String, dynamic>> models) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonString = jsonEncode(models);
+      await prefs.setString(_cacheKey, jsonString);
+      print('💾 Cached ${models.length} AR models locally');
+    } catch (e) {
+      print('⚠️ Error caching models: $e');
+      // Don't throw - cache failure shouldn't break the app
     }
   }
 
@@ -340,26 +426,32 @@ class _VideoARScannerPageState extends State<VideoARScannerPage>
           });
         },
         onScaleStart: (details) {
-          // Store initial scale and position when gesture starts
+          // Store initial scale, position, and focal point when gesture starts
           _initialScales[obj.id] = obj.scale;
           _initialPositions[obj.id] = obj.position;
+          _initialFocalPoints[obj.id] = details.focalPoint;
         },
         onScaleUpdate: (details) {
           setState(() {
             final initialScale = _initialScales[obj.id] ?? obj.scale;
             final initialPosition = _initialPositions[obj.id] ?? obj.position;
+            final initialFocalPoint =
+                _initialFocalPoints[obj.id] ?? details.focalPoint;
 
             // Handle scaling (pinch gesture)
             obj.scale = (initialScale * details.scale).clamp(0.5, 3.0);
 
-            // Handle panning (drag gesture) - focalPointDelta works for both single and multi-touch
-            obj.position = initialPosition + details.focalPointDelta;
+            // Handle panning (drag gesture)
+            // Calculate the movement from the initial focal point
+            final delta = details.focalPoint - initialFocalPoint;
+            obj.position = initialPosition + delta;
           });
         },
         onScaleEnd: (details) {
-          // Clear initial scale and position tracking
+          // Clear all tracking data
           _initialScales.remove(obj.id);
           _initialPositions.remove(obj.id);
+          _initialFocalPoints.remove(obj.id);
         },
         child: Transform.rotate(
           angle: obj.rotation,
@@ -370,13 +462,6 @@ class _VideoARScannerPageState extends State<VideoARScannerPage>
               border: isSelected
                   ? Border.all(color: Colors.yellow, width: 3)
                   : null,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.3),
-                  blurRadius: 10,
-                  spreadRadius: 2,
-                ),
-              ],
             ),
             child: Image.network(
               obj.imageUrl,
@@ -803,6 +888,12 @@ class _VideoARScannerPageState extends State<VideoARScannerPage>
 
   @override
   void dispose() {
+    print('🧹 Disposing VideoARScannerPage...');
+
+    // Cancel stream subscription to prevent memory leaks
+    _modelsSubscription?.cancel();
+    print('✅ Stream subscription cancelled');
+
     _cameraController?.dispose();
     _pulseController.dispose();
     super.dispose();

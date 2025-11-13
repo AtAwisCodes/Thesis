@@ -6,6 +6,7 @@ enum DisposalCategory {
   cans,
   cartons,
   unusedClothes,
+  glass,
 }
 
 extension DisposalCategoryExtension on DisposalCategory {
@@ -19,6 +20,8 @@ extension DisposalCategoryExtension on DisposalCategory {
         return 'Cartons';
       case DisposalCategory.unusedClothes:
         return 'Unused Clothes';
+      case DisposalCategory.glass:
+        return 'Glass';
     }
   }
 
@@ -32,6 +35,8 @@ extension DisposalCategoryExtension on DisposalCategory {
         return '📦';
       case DisposalCategory.unusedClothes:
         return '👕';
+      case DisposalCategory.glass:
+        return '🍷';
     }
   }
 

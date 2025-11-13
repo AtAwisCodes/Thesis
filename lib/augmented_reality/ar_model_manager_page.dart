@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+import 'dart:async';
 import 'package:http/http.dart' as http;
 import 'package:rexplore/services/ar_model_service.dart';
 import 'package:path_provider/path_provider.dart';
@@ -37,6 +38,9 @@ class _ARModelManagerPageState extends State<ARModelManagerPage> {
   bool _isUploading = false;
   bool _isVideoUploader = false;
   String? _loadError;
+
+  // Stream subscription for proper cleanup
+  StreamSubscription<List<Map<String, dynamic>>>? _modelsSubscription;
 
   // Remove.bg API key for background removal
   static const String _removeBgApiKey = 'V2BJ2X9HigKJ7hFJqp8TeUNu';
@@ -76,7 +80,11 @@ class _ARModelManagerPageState extends State<ARModelManagerPage> {
     try {
       print('🔍 AR Manager: Loading models for video: ${widget.videoId}');
 
-      _arModelService.getVideoARModels(widget.videoId).listen(
+      // Cancel existing subscription to prevent duplicates
+      await _modelsSubscription?.cancel();
+
+      _modelsSubscription =
+          _arModelService.getVideoARModels(widget.videoId).listen(
         (models) {
           if (mounted) {
             print('✅ AR Manager: Loaded ${models.length} models');
@@ -96,7 +104,10 @@ class _ARModelManagerPageState extends State<ARModelManagerPage> {
             });
           }
         },
+        cancelOnError: false,
       );
+
+      print('✅ AR Manager: Stream subscription created');
     } catch (e) {
       print('❌ AR Manager: Exception in _loadModels: $e');
       if (mounted) {
@@ -529,5 +540,14 @@ class _ARModelManagerPageState extends State<ARModelManagerPage> {
     } catch (e) {
       return 'Unknown';
     }
+  }
+
+  @override
+  void dispose() {
+    print('🧹 Disposing ARModelManagerPage...');
+    // Cancel stream subscription to prevent memory leaks
+    _modelsSubscription?.cancel();
+    print('✅ Stream subscription cancelled');
+    super.dispose();
   }
 }
