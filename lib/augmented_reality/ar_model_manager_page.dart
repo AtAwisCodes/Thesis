@@ -8,7 +8,7 @@ import 'package:path/path.dart' as path;
 import 'package:cloud_firestore/cloud_firestore.dart' as firestore;
 
 /// AR Model Manager Page - For video uploaders only
-/// 
+///
 /// Features:
 /// - Upload AR model images
 /// - Automatic background removal
@@ -36,6 +36,7 @@ class _ARModelManagerPageState extends State<ARModelManagerPage> {
   bool _isLoading = true;
   bool _isUploading = false;
   bool _isVideoUploader = false;
+  String? _loadError;
 
   // Remove.bg API key for background removal
   static const String _removeBgApiKey = 'V2BJ2X9HigKJ7hFJqp8TeUNu';
@@ -69,16 +70,42 @@ class _ARModelManagerPageState extends State<ARModelManagerPage> {
   Future<void> _loadModels() async {
     setState(() {
       _isLoading = true;
+      _loadError = null;
     });
 
-    _arModelService.getVideoARModels(widget.videoId).listen((models) {
+    try {
+      print('🔍 AR Manager: Loading models for video: ${widget.videoId}');
+
+      _arModelService.getVideoARModels(widget.videoId).listen(
+        (models) {
+          if (mounted) {
+            print('✅ AR Manager: Loaded ${models.length} models');
+            setState(() {
+              _models = models;
+              _isLoading = false;
+              _loadError = null;
+            });
+          }
+        },
+        onError: (error) {
+          print('❌ AR Manager: Error loading models: $error');
+          if (mounted) {
+            setState(() {
+              _isLoading = false;
+              _loadError = error.toString();
+            });
+          }
+        },
+      );
+    } catch (e) {
+      print('❌ AR Manager: Exception in _loadModels: $e');
       if (mounted) {
         setState(() {
-          _models = models;
           _isLoading = false;
+          _loadError = e.toString();
         });
       }
-    });
+    }
   }
 
   Future<void> _uploadModel() async {
@@ -177,7 +204,8 @@ class _ARModelManagerPageState extends State<ARModelManagerPage> {
       );
 
       request.headers['X-Api-Key'] = _removeBgApiKey;
-      request.files.add(await http.MultipartFile.fromPath('image_file', imageFile.path));
+      request.files
+          .add(await http.MultipartFile.fromPath('image_file', imageFile.path));
       request.fields['size'] = 'auto';
 
       final response = await request.send();
@@ -314,50 +342,88 @@ class _ARModelManagerPageState extends State<ARModelManagerPage> {
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
-                : _models.isEmpty
+                : _loadError != null
                     ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.view_in_ar,
-                              size: 80,
-                              color: Colors.grey[400],
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'No AR models yet',
-                              style: TextStyle(
-                                fontSize: 18,
-                                color: Colors.grey[600],
+                        child: Padding(
+                          padding: const EdgeInsets.all(32),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(
+                                Icons.error_outline,
+                                size: 64,
+                                color: Colors.red,
                               ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Upload images to create AR models',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[500],
+                              const SizedBox(height: 16),
+                              const Text(
+                                'Error loading AR models',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
-                            ),
-                          ],
+                              const SizedBox(height: 8),
+                              Text(
+                                _loadError!,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              ElevatedButton(
+                                onPressed: _loadModels,
+                                child: const Text('Retry'),
+                              ),
+                            ],
+                          ),
                         ),
                       )
-                    : GridView.builder(
-                        padding: const EdgeInsets.all(16),
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          crossAxisSpacing: 16,
-                          mainAxisSpacing: 16,
-                          childAspectRatio: 0.8,
-                        ),
-                        itemCount: _models.length,
-                        itemBuilder: (context, index) {
-                          final model = _models[index];
-                          return _buildModelCard(model);
-                        },
-                      ),
+                    : _models.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.view_in_ar,
+                                  size: 80,
+                                  color: Colors.grey[400],
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'No AR models yet',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Upload images to create AR models',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.grey[500],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : GridView.builder(
+                            padding: const EdgeInsets.all(16),
+                            gridDelegate:
+                                const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 2,
+                              crossAxisSpacing: 16,
+                              mainAxisSpacing: 16,
+                              childAspectRatio: 0.8,
+                            ),
+                            itemCount: _models.length,
+                            itemBuilder: (context, index) {
+                              final model = _models[index];
+                              return _buildModelCard(model);
+                            },
+                          ),
           ),
         ],
       ),
@@ -465,4 +531,3 @@ class _ARModelManagerPageState extends State<ARModelManagerPage> {
     }
   }
 }
-

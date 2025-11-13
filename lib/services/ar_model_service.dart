@@ -6,7 +6,7 @@ import 'package:path/path.dart' as path;
 import 'dart:io';
 
 /// Service for managing video-specific AR models
-/// 
+///
 /// Features:
 /// - Store AR models per video in Supabase (models bucket)
 /// - Firebase Firestore stores only the public URL
@@ -31,22 +31,38 @@ class ARModelService {
     required String modelName,
   }) async {
     try {
+      print('🎯 ARModelService.uploadARModel called');
+      print('   VideoId: $videoId');
+      print('   ModelName: $modelName');
+      print('   ImageFile: ${imageFile.path}');
+
       final user = _auth.currentUser;
-      if (user == null) throw Exception('User not authenticated');
+      if (user == null) {
+        print('❌ User not authenticated');
+        throw Exception('User not authenticated');
+      }
+
+      print('✅ User authenticated: ${user.uid}');
 
       // Get video data to verify uploader
+      print('🔍 Fetching video document...');
       final videoDoc = await _firestore.collection('videos').doc(videoId).get();
-      if (!videoDoc.exists) throw Exception('Video not found');
+      if (!videoDoc.exists) {
+        print('❌ Video not found: $videoId');
+        throw Exception('Video not found');
+      }
 
       final videoData = videoDoc.data()!;
       final videoUploaderId = videoData['userId'] as String;
+      print('✅ Video found. Uploader: $videoUploaderId');
 
       // Create storage path: {videoId}/{uploaderId}/{uuid}_{filename}
       final ext = path.extension(imageFile.path).toLowerCase();
       final fileName = '${_uuid.v4()}$ext';
       final filePath = '$videoId/$videoUploaderId/$fileName';
 
-      print('Uploading AR model to Supabase: models/$filePath');
+      print('📂 Storage path: models/$filePath');
+      print('⬆️ Uploading to Supabase...');
 
       // Upload image to Supabase Storage (models bucket)
       await _supabase.storage.from('models').upload(
@@ -61,7 +77,7 @@ class ARModelService {
       // Get public URL from Supabase
       final publicUrl = _supabase.storage.from('models').getPublicUrl(filePath);
 
-      print('AR model uploaded to Supabase. Public URL: $publicUrl');
+      print('✅ Uploaded to Supabase. Public URL: $publicUrl');
 
       // Create AR model document in Firestore with public URL
       final arModelData = {
@@ -77,6 +93,7 @@ class ARModelService {
         'isActive': true,
       };
 
+      print('💾 Saving to Firestore: videos/$videoId/arModels');
       final docRef = await _firestore
           .collection('videos')
           .doc(videoId)
@@ -85,24 +102,32 @@ class ARModelService {
 
       await docRef.update({'modelId': docRef.id});
 
-      print('AR model metadata saved to Firestore: ${docRef.id}');
+      print('✅ AR model metadata saved to Firestore: ${docRef.id}');
+      print('   Full path: videos/$videoId/arModels/${docRef.id}');
 
-      return {
+      final result = {
         'modelId': docRef.id,
         'imageUrl': publicUrl,
         ...arModelData,
       };
-    } catch (e) {
-      print('Error uploading AR model: $e');
+
+      print('🎉 Successfully created AR model: $modelName');
+      return result;
+    } catch (e, stackTrace) {
+      print('❌ Error uploading AR model: $e');
+      print('   Stack trace: $stackTrace');
       return null;
     }
   }
 
   /// Get all AR models for a specific video
   /// Returns all active models for the video - visible to ALL users (not just uploader)
-  /// Flow: User uploader → Fill details → Image uploaded to Supabase → 
+  /// Flow: User uploader → Fill details → Image uploaded to Supabase →
   ///       Firebase gets URL → Firebase stores metadata → Models displayed for video → All users see models
   Stream<List<Map<String, dynamic>>> getVideoARModels(String videoId) {
+    print('🔍 ARModelService: Fetching models for videoId: $videoId');
+    print('📍 Path: videos/$videoId/arModels');
+
     return _firestore
         .collection('videos')
         .doc(videoId)
@@ -110,13 +135,33 @@ class ARModelService {
         .where('isActive', isEqualTo: true)
         .orderBy('createdAt', descending: true)
         .snapshots()
-        .map((snapshot) {
-      return snapshot.docs
-          .map((doc) => {
-                'modelId': doc.id,
-                ...doc.data(),
-              })
-          .toList();
+        .handleError((error) {
+      print('❌ Firestore stream error in getVideoARModels: $error');
+      print('   VideoId: $videoId');
+      print('   Error type: ${error.runtimeType}');
+    }).map((snapshot) {
+      print('📦 Received ${snapshot.docs.length} AR model documents');
+
+      if (snapshot.docs.isEmpty) {
+        print('⚠️ No AR models found in videos/$videoId/arModels');
+        print('   This could mean:');
+        print('   1. No models have been uploaded yet');
+        print('   2. All models are marked as inactive');
+        print('   3. Firestore security rules are blocking access');
+      }
+
+      final models = snapshot.docs.map((doc) {
+        final data = doc.data();
+        print(
+            '   - Model: ${doc.id}, Name: ${data['modelName']}, Active: ${data['isActive']}');
+        return {
+          'modelId': doc.id,
+          ...data,
+        };
+      }).toList();
+
+      print('✅ Returning ${models.length} active AR models');
+      return models;
     });
   }
 
@@ -290,4 +335,3 @@ class ARModelService {
     }
   }
 }
-

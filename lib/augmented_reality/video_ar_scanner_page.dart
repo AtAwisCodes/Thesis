@@ -7,7 +7,7 @@ import 'package:image/image.dart' as img;
 import 'package:rexplore/services/ar_model_service.dart';
 
 /// Video-Specific AR Scanner Page
-/// 
+///
 /// Features:
 /// - Loads 2D models from video's AR model collection
 /// - Models are uploaded by video owner
@@ -41,6 +41,7 @@ class _VideoARScannerPageState extends State<VideoARScannerPage>
   List<Map<String, dynamic>> _availableModels = [];
   bool _isLoadingModels = true;
   String? _selectedModelId;
+  String? _modelLoadError;
   // Track initial scale and position for pinch/pan gestures
   Map<int, double> _initialScales = {};
   Map<int, Offset> _initialPositions = {};
@@ -109,16 +110,46 @@ class _VideoARScannerPageState extends State<VideoARScannerPage>
   Future<void> _loadARModels() async {
     setState(() {
       _isLoadingModels = true;
+      _modelLoadError = null;
     });
 
-    _arModelService.getVideoARModels(widget.videoId).listen((models) {
+    try {
+      print('🔍 Loading AR models for video: ${widget.videoId}');
+
+      _arModelService.getVideoARModels(widget.videoId).listen(
+        (models) {
+          if (mounted) {
+            print('✅ Loaded ${models.length} AR models successfully');
+            if (models.isNotEmpty) {
+              print(
+                  '📦 First model: ${models[0]['modelName']} - ${models[0]['imageUrl']}');
+            }
+            setState(() {
+              _availableModels = models;
+              _isLoadingModels = false;
+              _modelLoadError = null;
+            });
+          }
+        },
+        onError: (error) {
+          print('❌ Error loading AR models: $error');
+          if (mounted) {
+            setState(() {
+              _isLoadingModels = false;
+              _modelLoadError = error.toString();
+            });
+          }
+        },
+      );
+    } catch (e) {
+      print('❌ Exception in _loadARModels: $e');
       if (mounted) {
         setState(() {
-          _availableModels = models;
           _isLoadingModels = false;
+          _modelLoadError = e.toString();
         });
       }
-    });
+    }
   }
 
   @override
@@ -317,10 +348,10 @@ class _VideoARScannerPageState extends State<VideoARScannerPage>
           setState(() {
             final initialScale = _initialScales[obj.id] ?? obj.scale;
             final initialPosition = _initialPositions[obj.id] ?? obj.position;
-            
+
             // Handle scaling (pinch gesture)
             obj.scale = (initialScale * details.scale).clamp(0.5, 3.0);
-            
+
             // Handle panning (drag gesture) - focalPointDelta works for both single and multi-touch
             obj.position = initialPosition + details.focalPointDelta;
           });
@@ -423,7 +454,51 @@ class _VideoARScannerPageState extends State<VideoARScannerPage>
           const Spacer(),
 
           // Bottom instructions
-          if (_availableModels.isEmpty && !_isLoadingModels)
+          if (_modelLoadError != null && !_isLoadingModels)
+            Container(
+              margin: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.red.withOpacity(0.9),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.error_outline,
+                      color: Colors.white, size: 32),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Error loading AR models',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _modelLoadError!,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  ElevatedButton(
+                    onPressed: _loadARModels,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: Colors.red,
+                    ),
+                    child: const Text('Retry'),
+                  ),
+                ],
+              ),
+            )
+          else if (_availableModels.isEmpty && !_isLoadingModels)
             Container(
               margin: const EdgeInsets.all(20),
               padding: const EdgeInsets.all(16),
@@ -760,4 +835,3 @@ class PlacedARObject {
     this.imageHeight,
   });
 }
-

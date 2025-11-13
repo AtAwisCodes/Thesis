@@ -52,7 +52,7 @@ class VideoUploadService {
 
   //DITO MO LAGAY IP MO LANS YESHUA DE GUZMAN
   static const String _backendUrl = 'http://192.168.100.25:5000';
-  
+
   // Remove.bg API key for background removal
   static const String _removeBgApiKey = 'V2BJ2X9HigKJ7hFJqp8TeUNu';
 
@@ -508,8 +508,10 @@ class VideoUploadService {
         'likes': 0,
         'tags': [],
         'isPublic': true,
-        'modelImages': modelImageUrls, //Store AR model image URLs (for reference)
-        'has3DModel': false, // 3D models are generated separately, not from upload images
+        'modelImages':
+            modelImageUrls, //Store AR model image URLs (for reference)
+        'has3DModel':
+            false, // 3D models are generated separately, not from upload images
         'disposalCategory': disposalCategory, // Store disposal category
         'customSteps': customSteps, // Store custom steps
       };
@@ -555,7 +557,6 @@ class VideoUploadService {
       return VideoUploadResult.failure(e.toString());
     }
   }
-
 
   //Send notification to followers asynchronously (non-blocking)
   Future<void> _sendNewVideoNotificationAsync({
@@ -665,7 +666,7 @@ class VideoUploadService {
   }) async {
     try {
       print('Fetching uploaded models from backend storage...');
-      
+
       // Build query parameters
       final queryParams = <String, String>{};
       if (userId != null) {
@@ -675,14 +676,12 @@ class VideoUploadService {
         queryParams['video_id'] = videoId;
       }
 
-      final uri = Uri.parse('$_backendUrl/api/models/list')
-          .replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
+      final uri = Uri.parse('$_backendUrl/api/models/list').replace(
+          queryParameters: queryParams.isNotEmpty ? queryParams : null);
 
       print('Calling backend API: $uri');
 
-      final response = await http
-          .get(uri)
-          .timeout(
+      final response = await http.get(uri).timeout(
         const Duration(seconds: 30),
         onTimeout: () {
           throw Exception('Backend connection timeout while fetching models');
@@ -691,7 +690,7 @@ class VideoUploadService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        
+
         // Handle different response formats
         List<Map<String, dynamic>> models = [];
         if (data is List) {
@@ -705,15 +704,18 @@ class VideoUploadService {
           return [];
         }
 
-        print('Successfully fetched ${models.length} models from backend storage');
+        print(
+            'Successfully fetched ${models.length} models from backend storage');
         return models;
       } else {
         print('Backend returned error status: ${response.statusCode}');
         print('Response body: ${response.body}');
-        throw Exception('Failed to fetch models: ${response.statusCode} - ${response.body}');
+        throw Exception(
+            'Failed to fetch models: ${response.statusCode} - ${response.body}');
       }
     } on http.ClientException catch (e) {
-      final errorMsg = 'Cannot connect to backend at $_backendUrl. Is it running? Error: $e';
+      final errorMsg =
+          'Cannot connect to backend at $_backendUrl. Is it running? Error: $e';
       print(errorMsg);
       return [];
     } catch (e) {
@@ -819,7 +821,8 @@ class VideoUploadService {
       );
 
       request.headers['X-Api-Key'] = _removeBgApiKey;
-      request.files.add(await http.MultipartFile.fromPath('image_file', imageFile.path));
+      request.files
+          .add(await http.MultipartFile.fromPath('image_file', imageFile.path));
       request.fields['size'] = 'auto';
 
       final response = await request.send();
@@ -851,15 +854,23 @@ class VideoUploadService {
     required Function(double progress, String status) onProgress,
   }) async {
     try {
-      if (modelImages.isEmpty) return;
+      if (modelImages.isEmpty) {
+        print('⚠️ No model images to process');
+        return;
+      }
 
+      print(
+          '🎨 Processing ${modelImages.length} images into AR models for video: $videoId');
       final totalImages = modelImages.length;
       double step = 1.0 / totalImages;
       double currentProgress = 0.0;
+      int successCount = 0;
+      int failCount = 0;
 
       for (int i = 0; i < totalImages; i++) {
         final imageFile = modelImages[i];
-        
+
+        print('📸 Processing image ${i + 1}/$totalImages: ${imageFile.path}');
         onProgress(
           currentProgress,
           'Processing AR model ${i + 1}/$totalImages (removing background)...',
@@ -867,13 +878,16 @@ class VideoUploadService {
 
         // Step 1: Remove background
         final processedFile = await _removeBackground(imageFile);
-        
+
         if (processedFile == null) {
-          print('Failed to remove background for image ${i + 1}, skipping...');
+          print(
+              '❌ Failed to remove background for image ${i + 1}, skipping...');
+          failCount++;
           currentProgress += step;
           continue;
         }
 
+        print('✅ Background removed for image ${i + 1}');
         onProgress(
           currentProgress + (step * 0.3),
           'Processing AR model ${i + 1}/$totalImages (uploading)...',
@@ -882,7 +896,8 @@ class VideoUploadService {
         // Step 2: Upload to AR models (using ARModelService)
         // Generate model name based on index
         final modelName = 'Model ${i + 1}';
-        
+
+        print('⬆️ Uploading AR model "${modelName}" to Firestore...');
         final result = await _arModelService.uploadARModel(
           videoId: videoId,
           imageFile: processedFile,
@@ -890,9 +905,14 @@ class VideoUploadService {
         );
 
         if (result != null) {
-          print('AR model ${i + 1} created successfully: ${result['modelId']}');
+          print('✅ AR model ${i + 1} created successfully:');
+          print('   ModelId: ${result['modelId']}');
+          print('   ImageUrl: ${result['imageUrl']}');
+          print('   Path: videos/$videoId/arModels/${result['modelId']}');
+          successCount++;
         } else {
-          print('Failed to create AR model ${i + 1}');
+          print('❌ Failed to create AR model ${i + 1}');
+          failCount++;
         }
 
         currentProgress += step;
@@ -902,9 +922,16 @@ class VideoUploadService {
         );
       }
 
-      onProgress(1.0, 'All AR models processed successfully');
+      print('📊 AR Model Processing Summary:');
+      print('   Total: $totalImages');
+      print('   Success: $successCount');
+      print('   Failed: $failCount');
+
+      onProgress(1.0,
+          'All AR models processed: $successCount/$totalImages successful');
     } catch (e) {
-      print('Error processing model images into AR models: $e');
+      print('❌ Error processing model images into AR models: $e');
+      print('   Stack trace: ${StackTrace.current}');
       // Don't throw - allow video upload to complete even if AR processing fails
     }
   }

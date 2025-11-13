@@ -4,7 +4,6 @@ import 'package:rexplore/components/expandable_details.dart';
 import 'package:video_player/video_player.dart';
 import 'package:rexplore/services/favorites_manager.dart';
 import 'package:rexplore/augmented_reality/video_ar_scanner_page.dart';
-import 'package:rexplore/augmented_reality/ar_model_manager_page.dart';
 import 'package:rexplore/services/upload_function.dart';
 import 'package:rexplore/services/follow_service.dart';
 import 'package:rexplore/services/notification_service.dart';
@@ -1371,25 +1370,6 @@ class _UploadedVideoPlayerState extends State<UploadedVideoPlayer> {
         backgroundColor: Colors.transparent,
         automaticallyImplyLeading: false,
         actions: [
-          // AR Model Manager button (only for video uploader)
-          if (_uploaderUserId != null &&
-              _auth.currentUser?.uid == _uploaderUserId)
-            IconButton(
-              icon: const Icon(Icons.view_in_ar),
-              color: Colors.green[700],
-              tooltip: 'Manage AR Models',
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => ARModelManagerPage(
-                      videoId: widget.videoId,
-                      videoTitle: widget.title,
-                    ),
-                  ),
-                );
-              },
-            ),
           // Report button
           IconButton(
             icon: const Icon(Icons.flag_outlined),
