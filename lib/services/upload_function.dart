@@ -750,16 +750,10 @@ class VideoUploadService {
   Stream<List<Map<String, dynamic>>> getPublicVideos() {
     return _firestore
         .collection('videos')
-        .where('isDeleted', isEqualTo: false)
         .orderBy('uploadedAt', descending: true)
         .snapshots()
         .map((snapshot) {
       return snapshot.docs
-          .where((doc) {
-            // Double check isDeleted field (in case it doesn't exist, treat as not deleted)
-            final data = doc.data();
-            return data['isDeleted'] != true;
-          })
           .map((doc) => {
                 'id': doc.id,
                 ...doc.data(),
@@ -780,11 +774,6 @@ class VideoUploadService {
         .snapshots()
         .map((snapshot) {
       return snapshot.docs
-          .where((doc) {
-            // Filter out deleted videos
-            final data = doc.data();
-            return data['isDeleted'] != true;
-          })
           .map((doc) => {
                 'id': doc.id,
                 ...doc.data(),
