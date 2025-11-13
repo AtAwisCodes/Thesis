@@ -472,175 +472,6 @@ class _UserManagementPageState extends State<UserManagementPage> {
     }
   }
 
-  Future<void> _syncAllUsers() async {
-    // Show confirmation dialog
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.sync, color: Colors.blue),
-            SizedBox(width: 8),
-            Text('Sync All Users'),
-          ],
-        ),
-        content: const Text(
-          'This will scan the "count" collection and create user management documents for any missing users.\n\nContinue?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
-            child: const Text('Sync Users'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true) return;
-
-    try {
-      // Show loading dialog
-      if (mounted) {
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (context) => const AlertDialog(
-            content: Row(
-              children: [
-                CircularProgressIndicator(),
-                SizedBox(width: 16),
-                Expanded(child: Text('Syncing users from Firestore...')),
-              ],
-            ),
-          ),
-        );
-      }
-
-      // Get all users from 'count' collection (main user data)
-      final countSnapshot = await _firestore.collection('count').get();
-
-      int syncedCount = 0;
-      int skippedCount = 0;
-      int totalCount = countSnapshot.docs.length;
-
-      for (var countDoc in countSnapshot.docs) {
-        final userId = countDoc.id;
-        final countData = countDoc.data();
-
-        // Check if user document already exists in 'users' collection
-        final userDoc = await _firestore.collection('users').doc(userId).get();
-
-        if (!userDoc.exists) {
-          // Create the user document
-          final displayName =
-              '${countData['first_name'] ?? ''} ${countData['last_name'] ?? ''}'
-                  .trim();
-          await _firestore.collection('users').doc(userId).set({
-            'displayName': displayName.isEmpty ? 'Unknown User' : displayName,
-            'email': countData['email'] ?? '',
-            'avatarUrl': countData['avatar_url'] ?? '',
-            'createdAt':
-                countData['created_at'] ?? FieldValue.serverTimestamp(),
-            'isSuspended': false,
-            'isDeleted': false,
-          });
-          print('✅ Synced user: $displayName (${countData['email']})');
-          syncedCount++;
-        } else {
-          skippedCount++;
-        }
-      }
-
-      // Close loading dialog
-      if (mounted) {
-        Navigator.pop(context);
-
-        // Show detailed success dialog
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Row(
-              children: [
-                Icon(Icons.check_circle, color: Colors.green),
-                SizedBox(width: 8),
-                Text('Sync Complete'),
-              ],
-            ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('✅ Added: $syncedCount users',
-                    style: const TextStyle(fontWeight: FontWeight.bold)),
-                const SizedBox(height: 8),
-                Text('ℹ️ Already existed: $skippedCount users'),
-                const SizedBox(height: 8),
-                Text('📊 Total in "count" collection: $totalCount users'),
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.blue.shade200),
-                  ),
-                  child: const Row(
-                    children: [
-                      Icon(Icons.info_outline, color: Colors.blue, size: 20),
-                      SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Only users in the "count" collection are synced. If Firebase Auth users are missing, they need to log in at least once.',
-                          style: TextStyle(fontSize: 12),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            actions: [
-              ElevatedButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('OK'),
-              ),
-            ],
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        // Close loading dialog if open
-        Navigator.pop(context);
-
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Row(
-              children: [
-                Icon(Icons.error, color: Colors.red),
-                SizedBox(width: 8),
-                Text('Sync Failed'),
-              ],
-            ),
-            content: Text('Error syncing users: $e'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('OK'),
-              ),
-            ],
-          ),
-        );
-      }
-    }
-  }
-
   Future<void> _restoreUser(
       String userId, Map<String, dynamic> userData) async {
     final confirmed = await showDialog<bool>(
@@ -756,34 +587,14 @@ class _UserManagementPageState extends State<UserManagementPage> {
                 },
               ),
               const SizedBox(height: 16),
-              // Filter Chips and Sync Button
-              Row(
+              // Filter Chips
+              Wrap(
+                spacing: 12,
                 children: [
-                  Expanded(
-                    child: Wrap(
-                      spacing: 12,
-                      children: [
-                        _buildFilterChip('All Users', 'all'),
-                        _buildFilterChip('Active', 'active'),
-                        _buildFilterChip('Suspended', 'suspended'),
-                        _buildFilterChip('Deleted', 'deleted'),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  ElevatedButton.icon(
-                    onPressed: _syncAllUsers,
-                    icon: const Icon(Icons.sync),
-                    label: const Text('Sync All Users'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.deepPurple,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 12,
-                      ),
-                    ),
-                  ),
+                  _buildFilterChip('All Users', 'all'),
+                  _buildFilterChip('Active', 'active'),
+                  _buildFilterChip('Suspended', 'suspended'),
+                  _buildFilterChip('Deleted', 'deleted'),
                 ],
               ),
             ],
