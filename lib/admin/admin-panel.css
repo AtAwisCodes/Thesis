@@ -711,6 +711,12 @@ body {
     animation: fadeIn 0.2s ease;
 }
 
+/* Confirmation modals appear above regular modals */
+.modal-overlay .modal-overlay {
+    z-index: 1100;
+    background: rgba(0, 0, 0, 0.7);
+}
+
 @keyframes fadeIn {
     from { opacity: 0; }
     to { opacity: 1; }

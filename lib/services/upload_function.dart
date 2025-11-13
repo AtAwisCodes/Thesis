@@ -754,6 +754,11 @@ class VideoUploadService {
         .snapshots()
         .map((snapshot) {
       return snapshot.docs
+          .where((doc) {
+            final data = doc.data();
+            // Filter out deleted videos
+            return data['isDeleted'] != true;
+          })
           .map((doc) => {
                 'id': doc.id,
                 ...doc.data(),
@@ -774,6 +779,11 @@ class VideoUploadService {
         .snapshots()
         .map((snapshot) {
       return snapshot.docs
+          .where((doc) {
+            final data = doc.data();
+            // Filter out deleted videos
+            return data['isDeleted'] != true;
+          })
           .map((doc) => {
                 'id': doc.id,
                 ...doc.data(),

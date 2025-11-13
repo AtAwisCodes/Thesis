@@ -84,12 +84,40 @@ class AuthService {
       if (userDoc.exists) {
         final userData = userDoc.data()!;
         final isDeleted = userData['isDeleted'] ?? false;
+        final isSuspended = userData['isSuspended'] ?? false;
 
         if (isDeleted) {
           // Sign out immediately
           await FirebaseAuth.instance.signOut();
           throw Exception(
-              'This account has been deleted by administrators. Please contact support if you believe this is an error.');
+              'This account has been ban by administrators. Please contact support if you believe this is an error.');
+        }
+
+        if (isSuspended) {
+          // Check if suspension has expired
+          final suspensionEndDate = userData['suspensionEndDate'] as Timestamp?;
+
+          if (suspensionEndDate != null) {
+            final endDate = suspensionEndDate.toDate();
+            if (DateTime.now().isAfter(endDate)) {
+              // Auto-unsuspend if suspension period has ended
+              await _firestore.collection('users').doc(user.uid).update({
+                'isSuspended': false,
+              });
+              // Allow access to continue
+              return;
+            }
+          }
+
+          // Still suspended - sign out
+          await FirebaseAuth.instance.signOut();
+          final reason =
+              userData['suspensionReason'] ?? 'Community guideline violations';
+          final daysLeft = suspensionEndDate != null
+              ? suspensionEndDate.toDate().difference(DateTime.now()).inDays + 1
+              : 'indefinite';
+          throw Exception(
+              'Your account has been suspended. Reason: $reason. Duration: $daysLeft days remaining.');
         }
       }
     } catch (e) {

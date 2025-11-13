@@ -62,14 +62,19 @@ class _LoginPageState extends State<LoginPage> {
         return;
       }
 
-      // Check if account is deleted
+      // Check if account is deleted or suspended
       if (userCredential.user != null) {
         try {
           await AuthService().checkAccountStatus(userCredential.user!);
         } catch (e) {
-          // Account is deleted, show error
+          // Account is deleted or suspended, show error
           if (mounted) {
-            ErrorNotification.show(context, e.toString());
+            String errorMessage = e.toString();
+            // Remove 'Exception: ' prefix if present
+            if (errorMessage.startsWith('Exception: ')) {
+              errorMessage = errorMessage.substring(11);
+            }
+            ErrorNotification.show(context, errorMessage);
           }
           return;
         }
@@ -341,10 +346,13 @@ class _LoginPageState extends State<LoginPage> {
                           }
                         } catch (e) {
                           if (mounted) {
-                            ErrorNotification.show(
-                              context,
-                              'Unable to sign in with Google. Please try again.',
-                            );
+                            // Show the actual error message from checkAccountStatus
+                            String errorMessage = e.toString();
+                            // Remove 'Exception: ' prefix if present
+                            if (errorMessage.startsWith('Exception: ')) {
+                              errorMessage = errorMessage.substring(11);
+                            }
+                            ErrorNotification.show(context, errorMessage);
                           }
                         }
                       },

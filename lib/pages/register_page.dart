@@ -587,10 +587,13 @@ class _RegisterPageState extends State<RegisterPage> {
                           }
                         } catch (e) {
                           if (mounted) {
-                            ErrorNotification.show(
-                              context,
-                              'Unable to sign in with Google. Please try again.',
-                            );
+                            // Show the actual error message
+                            String errorMessage = e.toString();
+                            // Remove 'Exception: ' prefix if present
+                            if (errorMessage.startsWith('Exception: ')) {
+                              errorMessage = errorMessage.substring(11);
+                            }
+                            ErrorNotification.show(context, errorMessage);
                           }
                         }
                       },
