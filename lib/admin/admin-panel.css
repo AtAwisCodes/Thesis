@@ -768,6 +768,21 @@ body {
     animation: spin 1s linear infinite;
 }
 
+/* Info Row */
+.info-row {
+    padding: 8px 0;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.info-row:last-child {
+    border-bottom: none;
+}
+
+/* Video Container */
+video {
+    display: block;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     .dashboard-container {
@@ -785,5 +800,10 @@ body {
     
     .users-grid {
         grid-template-columns: 1fr;
+    }
+    
+    .modal {
+        width: 95% !important;
+        max-width: 95% !important;
     }
 }
