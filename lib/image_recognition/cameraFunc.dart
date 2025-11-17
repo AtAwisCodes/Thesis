@@ -34,7 +34,6 @@ class _cameraFuncState extends State<cameraFunc> {
     'PlasticBottles',
     'Cardboard',
     'Glass',
-    'AluminumCans',
     'Clothes',
   ];
 
