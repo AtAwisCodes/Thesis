@@ -693,6 +693,71 @@ class _cameraFuncState extends State<cameraFunc> {
                                 final originalLabel = _detectedLabel;
                                 final searchTerm = originalLabel.toLowerCase();
 
+                                // Check if "Empty" was detected - show error message then videos
+                                if (originalLabel == 'Empty') {
+                                  // Combine all videos for display
+                                  final allVideos = [
+                                    ...uploadedVideos.map((v) => {
+                                          "type": "uploaded",
+                                          "data": v,
+                                        }),
+                                    ...ytViewModel.playlistItems.map((yt) => {
+                                          "type": "youtube",
+                                          "data": yt,
+                                        }),
+                                  ];
+
+                                  return Column(
+                                    children: [
+                                      // Error message at the top
+                                      Container(
+                                        padding: const EdgeInsets.all(16),
+                                        margin: const EdgeInsets.fromLTRB(
+                                            16, 16, 16, 8),
+                                        decoration: BoxDecoration(
+                                          color: Colors.red.withOpacity(0.15),
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                          border: Border.all(
+                                            color: Colors.red.withOpacity(0.3),
+                                            width: 1,
+                                          ),
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            Icon(Icons.warning_amber_rounded,
+                                                color: Colors.red, size: 24),
+                                            const SizedBox(width: 12),
+                                            Expanded(
+                                              child: Text(
+                                                'Please scan a recyclable object (Plastic Bottles, Cardboard, Glass, or Clothes)',
+                                                style: TextStyle(
+                                                  color: Colors.red[300],
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      // Video list below error message
+                                      Expanded(
+                                        child: ListView.builder(
+                                          controller: scrollController,
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 16, vertical: 8),
+                                          itemCount: allVideos.length,
+                                          itemBuilder: (context, index) {
+                                            final item = allVideos[index];
+                                            return CompactVideoCard(item: item);
+                                          },
+                                        ),
+                                      ),
+                                    ],
+                                  );
+                                }
+
                                 // Debug: Print search term
                                 if (searchTerm.isNotEmpty) {
                                   print('Original label: "$originalLabel"');
