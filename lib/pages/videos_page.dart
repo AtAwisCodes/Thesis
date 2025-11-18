@@ -74,53 +74,59 @@ class _VideosPageState extends State<VideosPage> {
                       ),
                     ),
                   ),
+                  // Loading indicator when fetching all videos
+                  if (ytVideoViewModel.isLoading && combinedList.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const CircularProgressIndicator(color: Colors.green),
+                          const SizedBox(height: 12),
+                          Text(
+                            'Loading all videos...\n${ytVideoViewModel.playlistItems.length} loaded so far',
+                            style: const TextStyle(color: Colors.grey),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
+                    ),
                   // Video list
                   Expanded(
-                    child: NotificationListener<ScrollNotification>(
-                      onNotification: (scrollInfo) {
-                        if (scrollInfo.metrics.pixels ==
-                                scrollInfo.metrics.maxScrollExtent &&
-                            ytVideoViewModel.nextPageToken != null &&
-                            !ytVideoViewModel.isLoading) {
-                          ytVideoViewModel.getAllVideos(loadMore: true);
-                        }
-                        return false;
-                      },
-                      child: combinedList.isEmpty
-                          ? const Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  CircularProgressIndicator(
-                                      color: Colors.green),
-                                  SizedBox(height: 16),
-                                  Text(
-                                    'Loading videos...',
-                                    style: TextStyle(color: Colors.grey),
-                                  ),
-                                ],
-                              ),
-                            )
-                          : ListView.builder(
-                              itemCount: combinedList.length,
-                              itemBuilder: (context, index) {
-                                final item = combinedList[index];
-
-                                if (item["type"] == "uploaded") {
-                                  final videoData =
-                                      item["data"] as Map<String, dynamic>;
-                                  return UploadedVideoCard(
-                                    videos: videoData,
-                                  );
-                                } else {
-                                  final ytVideo = item["data"] as YtVideo;
-                                  return YoutubeVideoCard(
-                                    ytVideo: ytVideo,
-                                  );
-                                }
-                              },
+                    child: combinedList.isEmpty && !ytVideoViewModel.isLoading
+                        ? const Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.video_library,
+                                    size: 64, color: Colors.grey),
+                                SizedBox(height: 16),
+                                Text(
+                                  'No videos available',
+                                  style: TextStyle(color: Colors.grey),
+                                ),
+                              ],
                             ),
-                    ),
+                          )
+                        : ListView.builder(
+                            itemCount: combinedList.length,
+                            itemBuilder: (context, index) {
+                              final item = combinedList[index];
+
+                              if (item["type"] == "uploaded") {
+                                final videoData =
+                                    item["data"] as Map<String, dynamic>;
+                                return UploadedVideoCard(
+                                  videos: videoData,
+                                );
+                              } else {
+                                final ytVideo = item["data"] as YtVideo;
+                                return YoutubeVideoCard(
+                                  ytVideo: ytVideo,
+                                );
+                              }
+                            },
+                          ),
                   ),
                 ],
               );
