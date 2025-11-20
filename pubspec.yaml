@@ -98,7 +98,7 @@ flutter:
     - lib/icons/Recycle.gif
     - lib/icons/Landing.png
     - lib/icons/LandPic.png
-    - assets/models/recycle.tflite
+    - assets/models/model.tflite
     - assets/disposable_email_blocklist.txt
   #   - images/a_dot_ham.jpeg
 

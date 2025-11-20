@@ -31,13 +31,12 @@ class _cameraFuncState extends State<cameraFunc> {
   // Mirror Java labels
   static const List<String> _labels = <String>[
     'PlasticBottles',
-    'Cardboard',
     'Glass',
+    'Cardboard',
     'Clothes',
     'Empty',
   ];
 
-  String _predictionText = 'Loading model...';
   int _modelInputHeight = 0;
   int _modelInputWidth = 0;
   int _modelInputChannels = 0;
@@ -63,13 +62,9 @@ class _cameraFuncState extends State<cameraFunc> {
     try {
       await _loadModel();
       await _initCamera();
-      setState(() {
-        _predictionText = 'Tap capture button to analyze';
-      });
+      setState(() {});
     } catch (e) {
-      setState(() {
-        _predictionText = 'Init error: $e';
-      });
+      setState(() {});
     }
   }
 
@@ -77,7 +72,7 @@ class _cameraFuncState extends State<cameraFunc> {
     // Model path declared in pubspec assets
     final tfl.InterpreterOptions options = tfl.InterpreterOptions();
     final tfl.Interpreter interpreter = await tfl.Interpreter.fromAsset(
-      'assets/models/recycle.tflite',
+      'assets/models/model.tflite',
       options: options,
     );
 
@@ -125,7 +120,6 @@ class _cameraFuncState extends State<cameraFunc> {
         setState(() {
           _controller = null;
           _detectedLabel = '';
-          _predictionText = 'Switching camera...';
         });
       }
 
@@ -153,7 +147,6 @@ class _cameraFuncState extends State<cameraFunc> {
       if (mounted) {
         setState(() {
           _controller = controller;
-          _predictionText = 'Tap capture button to analyze';
         });
       }
     } catch (e) {
@@ -162,9 +155,7 @@ class _cameraFuncState extends State<cameraFunc> {
       _isSwitchingCamera = false;
 
       if (mounted) {
-        setState(() {
-          _predictionText = 'Camera switch failed';
-        });
+        setState(() {});
       }
 
       // Try to recover by reinitializing with the current index
@@ -203,14 +194,12 @@ class _cameraFuncState extends State<cameraFunc> {
       print('Toggle camera error: $e');
       if (mounted) {
         _isSwitchingCamera = false;
-        setState(() {
-          _predictionText = 'Failed to switch camera';
-        });
+        setState(() {});
       }
     });
   }
 
-  Future<void> _captureAndAnalyze() async {
+  Future<void> _capturePhoto() async {
     if (_isProcessing ||
         _controller == null ||
         !_controller!.value.isInitialized) {
@@ -218,8 +207,6 @@ class _cameraFuncState extends State<cameraFunc> {
     }
 
     setState(() {
-      _isProcessing = true;
-      _predictionText = 'Analyzing...';
       _showFlash = true;
     });
 
@@ -237,6 +224,40 @@ class _cameraFuncState extends State<cameraFunc> {
       final XFile imageFile = await _controller!.takePicture();
       final Uint8List imageBytes = await imageFile.readAsBytes();
 
+      // Navigate to preview page
+      if (mounted) {
+        final result = await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => PhotoPreviewPage(
+              imageBytes: imageBytes,
+              onAnalyze: (bytes) => _analyzeImage(bytes),
+            ),
+          ),
+        );
+
+        // If analysis was performed, update the state
+        if (result != null && result is Map<String, dynamic>) {
+          setState(() {
+            _detectedLabel = result['label'];
+          });
+        }
+      }
+    } catch (e) {
+      print('Capture error: $e');
+      if (mounted) {
+        setState(() {
+          _showFlash = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to capture photo: $e')),
+        );
+      }
+    }
+  }
+
+  Future<Map<String, dynamic>> _analyzeImage(Uint8List imageBytes) async {
+    try {
       // Decode image
       final img.Image? capturedImage = img.decodeImage(imageBytes);
 
@@ -266,31 +287,30 @@ class _cameraFuncState extends State<cameraFunc> {
         }
       }
 
-      const double threshold = 0.6;
+      const double threshold = 0.9;
       final String text = (maxVal > threshold)
           ? '${_labels[maxIdx]} ${(maxVal * 100).toStringAsFixed(1)}%'
           : 'Uncertain... Try again';
 
-      if (mounted) {
-        setState(() {
-          _predictionText = text;
-          _detectedLabel = maxVal > threshold ? _labels[maxIdx] : '';
-          _isProcessing = false;
-        });
+      final String label = maxVal > threshold ? _labels[maxIdx] : '';
 
-        // Debug: Print detected label
-        if (_detectedLabel.isNotEmpty) {
-          print('Detected label: "$_detectedLabel"');
-        }
+      // Debug: Print detected label
+      if (label.isNotEmpty) {
+        print('Detected label: "$label"');
       }
+
+      return {
+        'text': text,
+        'label': label,
+        'confidence': maxVal,
+      };
     } catch (e) {
-      print('Capture and analyze error: $e');
-      if (mounted) {
-        setState(() {
-          _predictionText = 'Error analyzing image';
-          _isProcessing = false;
-        });
-      }
+      print('Analyze error: $e');
+      return {
+        'text': 'Error analyzing image',
+        'label': '',
+        'confidence': 0.0,
+      };
     }
   }
 
@@ -385,12 +405,17 @@ class _cameraFuncState extends State<cameraFunc> {
     return Scaffold(
       backgroundColor: Colors.black,
       body: SafeArea(
-        child: Stack(
-          children: <Widget>[
-            // Camera section - full height
-            Column(
-              children: [
-                Expanded(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            // Calculate camera height to end at the scroll sheet position
+            final cameraHeight =
+                constraints.maxHeight * 0.67; // 67% because sheet starts at 33%
+
+            return Stack(
+              children: <Widget>[
+                // Camera section - sized to end at scroll sheet
+                SizedBox(
+                  height: cameraHeight,
                   child: Stack(
                     children: [
                       controller == null || !controller.value.isInitialized
@@ -510,16 +535,16 @@ class _cameraFuncState extends State<cameraFunc> {
                           ),
                         ),
                       ),
-                      // Capture button - centered at bottom
+                      // Capture button - centered at bottom of camera section
                       Positioned(
-                        bottom: 195,
+                        bottom: 20,
                         left: 0,
                         right: 0,
                         child: Center(
                           child: Material(
                             color: Colors.transparent,
                             child: InkWell(
-                              onTap: _isProcessing ? null : _captureAndAnalyze,
+                              onTap: _isProcessing ? null : _capturePhoto,
                               borderRadius: BorderRadius.circular(35),
                               child: Container(
                                 width: 70,
@@ -564,488 +589,424 @@ class _cameraFuncState extends State<cameraFunc> {
                     ],
                   ),
                 ),
-                // Detection info bar - fixed at bottom
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                  color: Colors.black,
-                  width: double.infinity,
-                  child: Text(
-                    _predictionText,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ],
-            ),
-            // Draggable video suggestions sheet
-            DraggableScrollableSheet(
-              controller: _sheetController,
-              initialChildSize: 0.33,
-              minChildSize: 0.33,
-              maxChildSize: 0.85,
-              snap: true,
-              snapSizes: const [0.33, 0.55, 0.85],
-              builder:
-                  (BuildContext context, ScrollController scrollController) {
-                return Container(
-                  decoration: BoxDecoration(
-                    color: Colors.grey[900],
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(20),
-                      topRight: Radius.circular(20),
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.5),
-                        blurRadius: 10,
-                        offset: const Offset(0, -2),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Drag handle and header
-                      GestureDetector(
-                        onTap: () {
-                          // Cycle through snap sizes on tap (33% -> 55% -> 85% -> 33%)
-                          if (_sheetController.size < 0.44) {
-                            _sheetController.animateTo(
-                              0.55,
-                              duration: const Duration(milliseconds: 300),
-                              curve: Curves.easeInOut,
-                            );
-                          } else if (_sheetController.size < 0.7) {
-                            _sheetController.animateTo(
-                              0.85,
-                              duration: const Duration(milliseconds: 300),
-                              curve: Curves.easeInOut,
-                            );
-                          } else {
-                            _sheetController.animateTo(
-                              0.33,
-                              duration: const Duration(milliseconds: 300),
-                              curve: Curves.easeInOut,
-                            );
-                          }
-                        },
-                        child: Container(
-                          color: Colors.transparent,
-                          child: Column(
-                            children: [
-                              // Drag indicator
-                              Container(
-                                margin: const EdgeInsets.only(top: 12),
-                                width: 40,
-                                height: 4,
-                                decoration: BoxDecoration(
-                                  color: Colors.grey[600],
-                                  borderRadius: BorderRadius.circular(2),
-                                ),
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.all(16.0),
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.lightbulb_outline,
-                                        color: Colors.greenAccent, size: 24),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text(
-                                        _detectedLabel.isNotEmpty
-                                            ? 'Videos about $_detectedLabel'
-                                            : 'Suggested Videos',
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ),
-                                    // Expand/collapse icon hint
-                                    Icon(
-                                      Icons.drag_handle,
-                                      color: Colors.grey[600],
-                                      size: 24,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
+                // Draggable video suggestions sheet
+                DraggableScrollableSheet(
+                  controller: _sheetController,
+                  initialChildSize: 0.33,
+                  minChildSize: 0.33,
+                  maxChildSize: 0.85,
+                  snap: true,
+                  snapSizes: const [0.33, 0.55, 0.85],
+                  builder: (BuildContext context,
+                      ScrollController scrollController) {
+                    return Container(
+                      decoration: BoxDecoration(
+                        color: Colors.grey[900],
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(20),
+                          topRight: Radius.circular(20),
                         ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.5),
+                            blurRadius: 10,
+                            offset: const Offset(0, -2),
+                          ),
+                        ],
                       ),
-                      // Video list with StreamBuilder
-                      Expanded(
-                        child: StreamBuilder<List<Map<String, dynamic>>>(
-                          stream: _videoService.getPublicVideos(),
-                          builder: (context, uploadedSnapshot) {
-                            return Consumer<YtVideoviewModel>(
-                              builder: (context, ytViewModel, _) {
-                                final uploadedVideos =
-                                    uploadedSnapshot.data ?? [];
-
-                                // Get the original label (not lowercase yet)
-                                final originalLabel = _detectedLabel;
-                                final searchTerm = originalLabel.toLowerCase();
-
-                                // Check if "Empty" was detected - show error message then videos
-                                if (originalLabel == 'Empty') {
-                                  // Combine all videos for display
-                                  final allVideos = [
-                                    ...uploadedVideos.map((v) => {
-                                          "type": "uploaded",
-                                          "data": v,
-                                        }),
-                                    ...ytViewModel.playlistItems.map((yt) => {
-                                          "type": "youtube",
-                                          "data": yt,
-                                        }),
-                                  ];
-
-                                  return Column(
-                                    children: [
-                                      // Error message at the top
-                                      Container(
-                                        padding: const EdgeInsets.all(16),
-                                        margin: const EdgeInsets.fromLTRB(
-                                            16, 16, 16, 8),
-                                        decoration: BoxDecoration(
-                                          color: Colors.red.withOpacity(0.15),
-                                          borderRadius:
-                                              BorderRadius.circular(12),
-                                          border: Border.all(
-                                            color: Colors.red.withOpacity(0.3),
-                                            width: 1,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Drag handle and header
+                          GestureDetector(
+                            onTap: () {
+                              // Cycle through snap sizes on tap (33% -> 55% -> 85% -> 33%)
+                              if (_sheetController.size < 0.44) {
+                                _sheetController.animateTo(
+                                  0.55,
+                                  duration: const Duration(milliseconds: 300),
+                                  curve: Curves.easeInOut,
+                                );
+                              } else if (_sheetController.size < 0.7) {
+                                _sheetController.animateTo(
+                                  0.85,
+                                  duration: const Duration(milliseconds: 300),
+                                  curve: Curves.easeInOut,
+                                );
+                              } else {
+                                _sheetController.animateTo(
+                                  0.33,
+                                  duration: const Duration(milliseconds: 300),
+                                  curve: Curves.easeInOut,
+                                );
+                              }
+                            },
+                            child: Container(
+                              color: Colors.transparent,
+                              child: Column(
+                                children: [
+                                  // Drag indicator
+                                  Container(
+                                    margin: const EdgeInsets.only(top: 12),
+                                    width: 40,
+                                    height: 4,
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey[600],
+                                      borderRadius: BorderRadius.circular(2),
+                                    ),
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.all(16.0),
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.lightbulb_outline,
+                                            color: Colors.greenAccent,
+                                            size: 24),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            _detectedLabel.isNotEmpty
+                                                ? 'Videos about $_detectedLabel'
+                                                : 'Suggested Videos',
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.bold,
+                                            ),
                                           ),
                                         ),
-                                        child: Row(
-                                          children: [
-                                            Icon(Icons.warning_amber_rounded,
-                                                color: Colors.red, size: 24),
-                                            const SizedBox(width: 12),
-                                            Expanded(
-                                              child: Text(
-                                                'Please scan a recyclable object (Plastic Bottles, Cardboard, Glass, or Clothes)',
-                                                style: TextStyle(
-                                                  color: Colors.red[300],
-                                                  fontSize: 13,
-                                                  fontWeight: FontWeight.w500,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      // Video list below error message
-                                      Expanded(
-                                        child: ListView.builder(
-                                          controller: scrollController,
-                                          padding: const EdgeInsets.symmetric(
-                                              horizontal: 16, vertical: 8),
-                                          itemCount: allVideos.length,
-                                          itemBuilder: (context, index) {
-                                            final item = allVideos[index];
-                                            return CompactVideoCard(item: item);
-                                          },
-                                        ),
-                                      ),
-                                    ],
-                                  );
-                                }
-
-                                // Debug: Print search term
-                                if (searchTerm.isNotEmpty) {
-                                  print('Original label: "$originalLabel"');
-                                  print(
-                                      'Searching for videos with: "$searchTerm"');
-                                  print(
-                                      'Total uploaded videos: ${uploadedVideos.length}');
-                                  print(
-                                      'Total YouTube videos: ${ytViewModel.playlistItems.length}');
-                                }
-
-                                // Create search variations for better matching
-                                List<String> searchVariations = [];
-                                if (originalLabel.isNotEmpty) {
-                                  // Add original lowercase version
-                                  searchVariations.add(searchTerm);
-
-                                  // Handle camelCase BEFORE converting to lowercase
-                                  // "PlasticBottles" -> "Plastic Bottles" -> "plastic bottles"
-                                  final spacedTerm = originalLabel
-                                      .replaceAllMapped(
-                                        RegExp(r'([a-z])([A-Z])'),
-                                        (match) =>
-                                            '${match.group(1)} ${match.group(2)}',
-                                      )
-                                      .replaceAllMapped(
-                                        RegExp(r'([A-Z])([A-Z][a-z])'),
-                                        (match) =>
-                                            '${match.group(1)} ${match.group(2)}',
-                                      )
-                                      .toLowerCase();
-
-                                  if (spacedTerm != searchTerm) {
-                                    searchVariations.add(spacedTerm);
-                                  }
-
-                                  // Add individual words (only if more than one word and length > 2)
-                                  final words = spacedTerm
-                                      .split(' ')
-                                      .where((w) => w.length > 2)
-                                      .toList();
-                                  if (words.length > 1) {
-                                    searchVariations.addAll(words);
-                                  }
-
-                                  // Remove duplicates
-                                  searchVariations =
-                                      searchVariations.toSet().toList();
-
-                                  print('Search variations: $searchVariations');
-                                }
-
-                                // Separate matching and non-matching videos
-                                final matchingUploaded =
-                                    <Map<String, dynamic>>[];
-                                final nonMatchingUploaded =
-                                    <Map<String, dynamic>>[];
-
-                                for (var video in uploadedVideos) {
-                                  if (searchTerm.isEmpty) {
-                                    nonMatchingUploaded.add(video);
-                                    continue;
-                                  }
-
-                                  final title = (video['title'] ?? '')
-                                      .toString()
-                                      .toLowerCase();
-                                  final description =
-                                      (video['description'] ?? '')
-                                          .toString()
-                                          .toLowerCase();
-
-                                  // Check if any search variation matches
-                                  final matches = searchVariations.any(
-                                      (variant) =>
-                                          title.contains(variant) ||
-                                          description.contains(variant));
-
-                                  if (matches) {
-                                    print(
-                                        'Uploaded video matched: ${video['title']}');
-                                    matchingUploaded.add(video);
-                                  } else {
-                                    nonMatchingUploaded.add(video);
-                                  }
-                                }
-
-                                final matchingYt = <dynamic>[];
-                                final nonMatchingYt = <dynamic>[];
-
-                                for (var yt in ytViewModel.playlistItems) {
-                                  if (searchTerm.isEmpty) {
-                                    nonMatchingYt.add(yt);
-                                    continue;
-                                  }
-
-                                  final title = yt.videoTitle.toLowerCase();
-
-                                  // Check if any search variation matches
-                                  final matches = searchVariations.any(
-                                      (variant) => title.contains(variant));
-
-                                  if (matches) {
-                                    print(
-                                        'YouTube video matched: ${yt.videoTitle}');
-                                    matchingYt.add(yt);
-                                  } else {
-                                    nonMatchingYt.add(yt);
-                                  }
-                                }
-
-                                print(
-                                    'Matching uploaded: ${matchingUploaded.length}');
-                                print('Matching YouTube: ${matchingYt.length}');
-                                print(
-                                    'Non-matching uploaded: ${nonMatchingUploaded.length}');
-                                print(
-                                    'Non-matching YouTube: ${nonMatchingYt.length}');
-
-                                // Combine: matching videos first, then non-matching
-                                final combinedList = [
-                                  ...matchingUploaded.map((v) => {
-                                        "type": "uploaded",
-                                        "data": v,
-                                        "isMatch": true
-                                      }),
-                                  ...matchingYt.map((yt) => {
-                                        "type": "youtube",
-                                        "data": yt,
-                                        "isMatch": true
-                                      }),
-                                  ...nonMatchingUploaded.map((v) => {
-                                        "type": "uploaded",
-                                        "data": v,
-                                        "isMatch": false
-                                      }),
-                                  ...nonMatchingYt.map((yt) => {
-                                        "type": "youtube",
-                                        "data": yt,
-                                        "isMatch": false
-                                      }),
-                                ];
-
-                                if (combinedList.isEmpty) {
-                                  return const Center(
-                                    child: Column(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Icon(Icons.video_library,
-                                            color: Colors.grey, size: 48),
-                                        SizedBox(height: 16),
-                                        Text(
-                                          'No videos found',
-                                          style: TextStyle(color: Colors.grey),
-                                        ),
-                                        SizedBox(height: 8),
-                                        Text(
-                                          'Try scanning an object!',
-                                          style: TextStyle(
-                                              color: Colors.grey, fontSize: 12),
+                                        // Expand/collapse icon hint
+                                        Icon(
+                                          Icons.drag_handle,
+                                          color: Colors.grey[600],
+                                          size: 24,
                                         ),
                                       ],
                                     ),
-                                  );
-                                }
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          // Video list with StreamBuilder
+                          Expanded(
+                            child: StreamBuilder<List<Map<String, dynamic>>>(
+                              stream: _videoService.getPublicVideos(),
+                              builder: (context, uploadedSnapshot) {
+                                return Consumer<YtVideoviewModel>(
+                                  builder: (context, ytViewModel, _) {
+                                    final uploadedVideos =
+                                        uploadedSnapshot.data ?? [];
 
-                                // Calculate where the divider should be
-                                final matchingCount =
-                                    matchingUploaded.length + matchingYt.length;
-                                final hasMatching =
-                                    matchingCount > 0 && searchTerm.isNotEmpty;
-                                final hasNonMatching =
-                                    combinedList.length > matchingCount;
-                                final objectDetectedButNoMatch =
-                                    searchTerm.isNotEmpty &&
-                                        matchingCount == 0 &&
-                                        hasNonMatching;
+                                    // Get the original label (not lowercase yet)
+                                    final originalLabel = _detectedLabel;
+                                    final searchTerm =
+                                        originalLabel.toLowerCase();
 
-                                // Calculate number of headers needed
-                                int headerCount = 0;
-                                if (hasMatching && hasNonMatching) {
-                                  headerCount =
-                                      2; // Both matching and other videos headers
-                                } else if (objectDetectedButNoMatch) {
-                                  headerCount = 1; // Only "no match" header
-                                }
+                                    // Check if "Empty" was detected - show error message then videos
+                                    if (originalLabel == 'Empty') {
+                                      // Combine all videos for display
+                                      final allVideos = [
+                                        ...uploadedVideos.map((v) => {
+                                              "type": "uploaded",
+                                              "data": v,
+                                            }),
+                                        ...ytViewModel.playlistItems
+                                            .map((yt) => {
+                                                  "type": "youtube",
+                                                  "data": yt,
+                                                }),
+                                      ];
 
-                                return ListView.builder(
-                                  controller: scrollController,
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 16, vertical: 8),
-                                  itemCount: combinedList.length + headerCount,
-                                  itemBuilder: (context, index) {
-                                    // Show matching section header at the top
-                                    if (index == 0 && hasMatching) {
-                                      return Container(
-                                        padding: const EdgeInsets.symmetric(
-                                            vertical: 12, horizontal: 12),
-                                        margin:
-                                            const EdgeInsets.only(bottom: 8),
-                                        decoration: BoxDecoration(
-                                          color: Colors.greenAccent
-                                              .withOpacity(0.1),
-                                          borderRadius:
-                                              BorderRadius.circular(10),
-                                          border: Border.all(
-                                            color: Colors.greenAccent
-                                                .withOpacity(0.3),
-                                            width: 1,
-                                          ),
-                                        ),
-                                        child: Row(
-                                          children: [
-                                            Container(
-                                              padding: const EdgeInsets.all(8),
-                                              decoration: BoxDecoration(
-                                                color: Colors.greenAccent,
-                                                shape: BoxShape.circle,
-                                              ),
-                                              child: const Icon(
-                                                Icons.check,
-                                                color: Colors.black,
-                                                size: 16,
+                                      return Column(
+                                        children: [
+                                          // Error message at the top
+                                          Container(
+                                            padding: const EdgeInsets.all(16),
+                                            margin: const EdgeInsets.fromLTRB(
+                                                16, 16, 16, 8),
+                                            decoration: BoxDecoration(
+                                              color:
+                                                  Colors.red.withOpacity(0.15),
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                              border: Border.all(
+                                                color:
+                                                    Colors.red.withOpacity(0.3),
+                                                width: 1,
                                               ),
                                             ),
-                                            const SizedBox(width: 12),
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.start,
-                                                children: [
-                                                  Text(
-                                                    'Related to ${_detectedLabel}',
-                                                    style: const TextStyle(
-                                                      color: Colors.greenAccent,
-                                                      fontSize: 15,
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                    ),
-                                                  ),
-                                                  Text(
-                                                    '$matchingCount video${matchingCount != 1 ? 's' : ''} found',
+                                            child: Row(
+                                              children: [
+                                                Icon(
+                                                    Icons.warning_amber_rounded,
+                                                    color: Colors.red,
+                                                    size: 24),
+                                                const SizedBox(width: 12),
+                                                Expanded(
+                                                  child: Text(
+                                                    'Please scan a recyclable object (Plastic Bottles, Cardboard, Glass, or Clothes)',
                                                     style: TextStyle(
-                                                      color: Colors.greenAccent
-                                                          .withOpacity(0.7),
-                                                      fontSize: 12,
+                                                      color: Colors.red[300],
+                                                      fontSize: 13,
+                                                      fontWeight:
+                                                          FontWeight.w500,
                                                     ),
                                                   ),
-                                                ],
-                                              ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          // Video list below error message
+                                          Expanded(
+                                            child: ListView.builder(
+                                              controller: scrollController,
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 16,
+                                                      vertical: 8),
+                                              itemCount: allVideos.length,
+                                              itemBuilder: (context, index) {
+                                                final item = allVideos[index];
+                                                return CompactVideoCard(
+                                                    item: item);
+                                              },
+                                            ),
+                                          ),
+                                        ],
+                                      );
+                                    }
+
+                                    // Debug: Print search term
+                                    if (searchTerm.isNotEmpty) {
+                                      print('Original label: "$originalLabel"');
+                                      print(
+                                          'Searching for videos with: "$searchTerm"');
+                                      print(
+                                          'Total uploaded videos: ${uploadedVideos.length}');
+                                      print(
+                                          'Total YouTube videos: ${ytViewModel.playlistItems.length}');
+                                    }
+
+                                    // Create search variations for better matching
+                                    List<String> searchVariations = [];
+                                    if (originalLabel.isNotEmpty) {
+                                      // Add original lowercase version
+                                      searchVariations.add(searchTerm);
+
+                                      // Handle camelCase BEFORE converting to lowercase
+                                      // "PlasticBottles" -> "Plastic Bottles" -> "plastic bottles"
+                                      final spacedTerm = originalLabel
+                                          .replaceAllMapped(
+                                            RegExp(r'([a-z])([A-Z])'),
+                                            (match) =>
+                                                '${match.group(1)} ${match.group(2)}',
+                                          )
+                                          .replaceAllMapped(
+                                            RegExp(r'([A-Z])([A-Z][a-z])'),
+                                            (match) =>
+                                                '${match.group(1)} ${match.group(2)}',
+                                          )
+                                          .toLowerCase();
+
+                                      if (spacedTerm != searchTerm) {
+                                        searchVariations.add(spacedTerm);
+                                      }
+
+                                      // Add individual words (only if more than one word and length > 2)
+                                      final words = spacedTerm
+                                          .split(' ')
+                                          .where((w) => w.length > 2)
+                                          .toList();
+                                      if (words.length > 1) {
+                                        searchVariations.addAll(words);
+                                      }
+
+                                      // Remove duplicates
+                                      searchVariations =
+                                          searchVariations.toSet().toList();
+
+                                      print(
+                                          'Search variations: $searchVariations');
+                                    }
+
+                                    // Separate matching and non-matching videos
+                                    final matchingUploaded =
+                                        <Map<String, dynamic>>[];
+                                    final nonMatchingUploaded =
+                                        <Map<String, dynamic>>[];
+
+                                    for (var video in uploadedVideos) {
+                                      if (searchTerm.isEmpty) {
+                                        nonMatchingUploaded.add(video);
+                                        continue;
+                                      }
+
+                                      final title = (video['title'] ?? '')
+                                          .toString()
+                                          .toLowerCase();
+                                      final description =
+                                          (video['description'] ?? '')
+                                              .toString()
+                                              .toLowerCase();
+
+                                      // Check if any search variation matches
+                                      final matches = searchVariations.any(
+                                          (variant) =>
+                                              title.contains(variant) ||
+                                              description.contains(variant));
+
+                                      if (matches) {
+                                        print(
+                                            'Uploaded video matched: ${video['title']}');
+                                        matchingUploaded.add(video);
+                                      } else {
+                                        nonMatchingUploaded.add(video);
+                                      }
+                                    }
+
+                                    final matchingYt = <dynamic>[];
+                                    final nonMatchingYt = <dynamic>[];
+
+                                    for (var yt in ytViewModel.playlistItems) {
+                                      if (searchTerm.isEmpty) {
+                                        nonMatchingYt.add(yt);
+                                        continue;
+                                      }
+
+                                      final title = yt.videoTitle.toLowerCase();
+
+                                      // Check if any search variation matches
+                                      final matches = searchVariations.any(
+                                          (variant) => title.contains(variant));
+
+                                      if (matches) {
+                                        print(
+                                            'YouTube video matched: ${yt.videoTitle}');
+                                        matchingYt.add(yt);
+                                      } else {
+                                        nonMatchingYt.add(yt);
+                                      }
+                                    }
+
+                                    print(
+                                        'Matching uploaded: ${matchingUploaded.length}');
+                                    print(
+                                        'Matching YouTube: ${matchingYt.length}');
+                                    print(
+                                        'Non-matching uploaded: ${nonMatchingUploaded.length}');
+                                    print(
+                                        'Non-matching YouTube: ${nonMatchingYt.length}');
+
+                                    // Combine: matching videos first, then non-matching
+                                    final combinedList = [
+                                      ...matchingUploaded.map((v) => {
+                                            "type": "uploaded",
+                                            "data": v,
+                                            "isMatch": true
+                                          }),
+                                      ...matchingYt.map((yt) => {
+                                            "type": "youtube",
+                                            "data": yt,
+                                            "isMatch": true
+                                          }),
+                                      ...nonMatchingUploaded.map((v) => {
+                                            "type": "uploaded",
+                                            "data": v,
+                                            "isMatch": false
+                                          }),
+                                      ...nonMatchingYt.map((yt) => {
+                                            "type": "youtube",
+                                            "data": yt,
+                                            "isMatch": false
+                                          }),
+                                    ];
+
+                                    if (combinedList.isEmpty) {
+                                      return const Center(
+                                        child: Column(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            Icon(Icons.video_library,
+                                                color: Colors.grey, size: 48),
+                                            SizedBox(height: 16),
+                                            Text(
+                                              'No videos found',
+                                              style:
+                                                  TextStyle(color: Colors.grey),
+                                            ),
+                                            SizedBox(height: 8),
+                                            Text(
+                                              'Try scanning an object!',
+                                              style: TextStyle(
+                                                  color: Colors.grey,
+                                                  fontSize: 12),
                                             ),
                                           ],
                                         ),
                                       );
                                     }
 
-                                    // Show "no match found" header when object detected but no matching videos
-                                    if (index == 0 &&
-                                        objectDetectedButNoMatch) {
-                                      return Container(
-                                        padding: const EdgeInsets.all(12),
-                                        margin:
-                                            const EdgeInsets.only(bottom: 8),
-                                        decoration: BoxDecoration(
-                                          color: Colors.orange.withOpacity(0.1),
-                                          borderRadius:
-                                              BorderRadius.circular(10),
-                                          border: Border.all(
-                                            color:
-                                                Colors.orange.withOpacity(0.3),
-                                            width: 1,
-                                          ),
-                                        ),
-                                        child: Column(
-                                          children: [
-                                            Row(
+                                    // Calculate where the divider should be
+                                    final matchingCount =
+                                        matchingUploaded.length +
+                                            matchingYt.length;
+                                    final hasMatching = matchingCount > 0 &&
+                                        searchTerm.isNotEmpty;
+                                    final hasNonMatching =
+                                        combinedList.length > matchingCount;
+                                    final objectDetectedButNoMatch =
+                                        searchTerm.isNotEmpty &&
+                                            matchingCount == 0 &&
+                                            hasNonMatching;
+
+                                    // Calculate number of headers needed
+                                    int headerCount = 0;
+                                    if (hasMatching && hasNonMatching) {
+                                      headerCount =
+                                          2; // Both matching and other videos headers
+                                    } else if (objectDetectedButNoMatch) {
+                                      headerCount = 1; // Only "no match" header
+                                    }
+
+                                    return ListView.builder(
+                                      controller: scrollController,
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 16, vertical: 8),
+                                      itemCount:
+                                          combinedList.length + headerCount,
+                                      itemBuilder: (context, index) {
+                                        // Show matching section header at the top
+                                        if (index == 0 && hasMatching) {
+                                          return Container(
+                                            padding: const EdgeInsets.symmetric(
+                                                vertical: 12, horizontal: 12),
+                                            margin: const EdgeInsets.only(
+                                                bottom: 8),
+                                            decoration: BoxDecoration(
+                                              color: Colors.greenAccent
+                                                  .withOpacity(0.1),
+                                              borderRadius:
+                                                  BorderRadius.circular(10),
+                                              border: Border.all(
+                                                color: Colors.greenAccent
+                                                    .withOpacity(0.3),
+                                                width: 1,
+                                              ),
+                                            ),
+                                            child: Row(
                                               children: [
                                                 Container(
                                                   padding:
                                                       const EdgeInsets.all(8),
                                                   decoration: BoxDecoration(
-                                                    color: Colors.orange,
+                                                    color: Colors.greenAccent,
                                                     shape: BoxShape.circle,
                                                   ),
                                                   child: const Icon(
-                                                    Icons.info_outline,
-                                                    color: Colors.white,
+                                                    Icons.check,
+                                                    color: Colors.black,
                                                     size: 16,
                                                   ),
                                                 ),
@@ -1057,20 +1018,22 @@ class _cameraFuncState extends State<cameraFunc> {
                                                             .start,
                                                     children: [
                                                       Text(
-                                                        'No matches for "${_detectedLabel}"',
+                                                        'Related to ${_detectedLabel}',
                                                         style: const TextStyle(
-                                                          color: Colors.orange,
-                                                          fontSize: 14,
+                                                          color: Colors
+                                                              .greenAccent,
+                                                          fontSize: 15,
                                                           fontWeight:
                                                               FontWeight.bold,
                                                         ),
                                                       ),
                                                       Text(
-                                                        'Showing all available videos',
+                                                        '$matchingCount video${matchingCount != 1 ? 's' : ''} found',
                                                         style: TextStyle(
-                                                          color: Colors.orange
+                                                          color: Colors
+                                                              .greenAccent
                                                               .withOpacity(0.7),
-                                                          fontSize: 11,
+                                                          fontSize: 12,
                                                         ),
                                                       ),
                                                     ],
@@ -1078,126 +1041,443 @@ class _cameraFuncState extends State<cameraFunc> {
                                                 ),
                                               ],
                                             ),
-                                            const Divider(
-                                                height: 16, color: Colors.grey),
-                                            Row(
+                                          );
+                                        }
+
+                                        // Show "no match found" header when object detected but no matching videos
+                                        if (index == 0 &&
+                                            objectDetectedButNoMatch) {
+                                          return Container(
+                                            padding: const EdgeInsets.all(12),
+                                            margin: const EdgeInsets.only(
+                                                bottom: 8),
+                                            decoration: BoxDecoration(
+                                              color: Colors.orange
+                                                  .withOpacity(0.1),
+                                              borderRadius:
+                                                  BorderRadius.circular(10),
+                                              border: Border.all(
+                                                color: Colors.orange
+                                                    .withOpacity(0.3),
+                                                width: 1,
+                                              ),
+                                            ),
+                                            child: Column(
                                               children: [
-                                                Icon(Icons.video_library,
-                                                    color: Colors.grey,
-                                                    size: 18),
-                                                const SizedBox(width: 8),
-                                                Text(
-                                                  'All Videos (${combinedList.length})',
-                                                  style: const TextStyle(
-                                                    color: Colors.grey,
-                                                    fontSize: 13,
-                                                    fontWeight: FontWeight.w600,
+                                                Row(
+                                                  children: [
+                                                    Container(
+                                                      padding:
+                                                          const EdgeInsets.all(
+                                                              8),
+                                                      decoration: BoxDecoration(
+                                                        color: Colors.orange,
+                                                        shape: BoxShape.circle,
+                                                      ),
+                                                      child: const Icon(
+                                                        Icons.info_outline,
+                                                        color: Colors.white,
+                                                        size: 16,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 12),
+                                                    Expanded(
+                                                      child: Column(
+                                                        crossAxisAlignment:
+                                                            CrossAxisAlignment
+                                                                .start,
+                                                        children: [
+                                                          Text(
+                                                            'No matches for "${_detectedLabel}"',
+                                                            style:
+                                                                const TextStyle(
+                                                              color:
+                                                                  Colors.orange,
+                                                              fontSize: 14,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .bold,
+                                                            ),
+                                                          ),
+                                                          Text(
+                                                            'Showing all available videos',
+                                                            style: TextStyle(
+                                                              color: Colors
+                                                                  .orange
+                                                                  .withOpacity(
+                                                                      0.7),
+                                                              fontSize: 11,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                                const Divider(
+                                                    height: 16,
+                                                    color: Colors.grey),
+                                                Row(
+                                                  children: [
+                                                    Icon(Icons.video_library,
+                                                        color: Colors.grey,
+                                                        size: 18),
+                                                    const SizedBox(width: 8),
+                                                    Text(
+                                                      'All Videos (${combinedList.length})',
+                                                      style: const TextStyle(
+                                                        color: Colors.grey,
+                                                        fontSize: 13,
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ],
+                                            ),
+                                          );
+                                        }
+
+                                        // Show other videos section header
+                                        if (hasMatching &&
+                                            hasNonMatching &&
+                                            index == matchingCount + 1) {
+                                          return Container(
+                                            padding: const EdgeInsets.symmetric(
+                                                vertical: 12, horizontal: 12),
+                                            margin: const EdgeInsets.only(
+                                                top: 8, bottom: 8),
+                                            decoration: BoxDecoration(
+                                              color:
+                                                  Colors.grey.withOpacity(0.1),
+                                              borderRadius:
+                                                  BorderRadius.circular(10),
+                                              border: Border.all(
+                                                color: Colors.grey
+                                                    .withOpacity(0.3),
+                                                width: 1,
+                                              ),
+                                            ),
+                                            child: Row(
+                                              children: [
+                                                Container(
+                                                  padding:
+                                                      const EdgeInsets.all(8),
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.grey[700],
+                                                    shape: BoxShape.circle,
+                                                  ),
+                                                  child: const Icon(
+                                                    Icons.video_library,
+                                                    color: Colors.white,
+                                                    size: 16,
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 12),
+                                                Expanded(
+                                                  child: Column(
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment
+                                                            .start,
+                                                    children: [
+                                                      const Text(
+                                                        'Other Videos',
+                                                        style: TextStyle(
+                                                          color: Colors.grey,
+                                                          fontSize: 15,
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                        ),
+                                                      ),
+                                                      Text(
+                                                        '${combinedList.length - matchingCount} more video${(combinedList.length - matchingCount) != 1 ? 's' : ''}',
+                                                        style: TextStyle(
+                                                          color: Colors.grey
+                                                              .withOpacity(0.7),
+                                                          fontSize: 12,
+                                                        ),
+                                                      ),
+                                                    ],
                                                   ),
                                                 ),
                                               ],
                                             ),
-                                          ],
-                                        ),
-                                      );
-                                    }
+                                          );
+                                        }
 
-                                    // Show other videos section header
-                                    if (hasMatching &&
-                                        hasNonMatching &&
-                                        index == matchingCount + 1) {
-                                      return Container(
-                                        padding: const EdgeInsets.symmetric(
-                                            vertical: 12, horizontal: 12),
-                                        margin: const EdgeInsets.only(
-                                            top: 8, bottom: 8),
-                                        decoration: BoxDecoration(
-                                          color: Colors.grey.withOpacity(0.1),
-                                          borderRadius:
-                                              BorderRadius.circular(10),
-                                          border: Border.all(
-                                            color: Colors.grey.withOpacity(0.3),
-                                            width: 1,
-                                          ),
-                                        ),
-                                        child: Row(
-                                          children: [
-                                            Container(
-                                              padding: const EdgeInsets.all(8),
-                                              decoration: BoxDecoration(
-                                                color: Colors.grey[700],
-                                                shape: BoxShape.circle,
-                                              ),
-                                              child: const Icon(
-                                                Icons.video_library,
-                                                color: Colors.white,
-                                                size: 16,
-                                              ),
-                                            ),
-                                            const SizedBox(width: 12),
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.start,
-                                                children: [
-                                                  const Text(
-                                                    'Other Videos',
-                                                    style: TextStyle(
-                                                      color: Colors.grey,
-                                                      fontSize: 15,
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                    ),
-                                                  ),
-                                                  Text(
-                                                    '${combinedList.length - matchingCount} more video${(combinedList.length - matchingCount) != 1 ? 's' : ''}',
-                                                    style: TextStyle(
-                                                      color: Colors.grey
-                                                          .withOpacity(0.7),
-                                                      fontSize: 12,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      );
-                                    }
+                                        // Adjust index for actual video items
+                                        int videoIndex;
+                                        if (hasMatching && hasNonMatching) {
+                                          videoIndex = index <= matchingCount
+                                              ? index - 1
+                                              : index - 2;
+                                        } else if (objectDetectedButNoMatch) {
+                                          videoIndex = index - 1;
+                                        } else if (hasMatching) {
+                                          videoIndex = index - 1;
+                                        } else {
+                                          videoIndex = index;
+                                        }
 
-                                    // Adjust index for actual video items
-                                    int videoIndex;
-                                    if (hasMatching && hasNonMatching) {
-                                      videoIndex = index <= matchingCount
-                                          ? index - 1
-                                          : index - 2;
-                                    } else if (objectDetectedButNoMatch) {
-                                      videoIndex = index - 1;
-                                    } else if (hasMatching) {
-                                      videoIndex = index - 1;
-                                    } else {
-                                      videoIndex = index;
-                                    }
+                                        if (videoIndex < 0 ||
+                                            videoIndex >= combinedList.length) {
+                                          return const SizedBox.shrink();
+                                        }
 
-                                    if (videoIndex < 0 ||
-                                        videoIndex >= combinedList.length) {
-                                      return const SizedBox.shrink();
-                                    }
+                                        final item = combinedList[videoIndex];
 
-                                    final item = combinedList[videoIndex];
-
-                                    // Use compact video card for better UX
-                                    return CompactVideoCard(item: item);
+                                        // Use compact video card for better UX
+                                        return CompactVideoCard(item: item);
+                                      },
+                                    );
                                   },
                                 );
                               },
-                            );
-                          },
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+// Separate page for photo preview
+class PhotoPreviewPage extends StatefulWidget {
+  final Uint8List imageBytes;
+  final Future<Map<String, dynamic>> Function(Uint8List) onAnalyze;
+
+  const PhotoPreviewPage({
+    Key? key,
+    required this.imageBytes,
+    required this.onAnalyze,
+  }) : super(key: key);
+
+  @override
+  State<PhotoPreviewPage> createState() => _PhotoPreviewPageState();
+}
+
+class _PhotoPreviewPageState extends State<PhotoPreviewPage> {
+  bool _isAnalyzing = false;
+  String? _resultText;
+  bool _hasAnalyzed = false;
+
+  Future<void> _analyze() async {
+    setState(() {
+      _isAnalyzing = true;
+    });
+
+    try {
+      final result = await widget.onAnalyze(widget.imageBytes);
+      setState(() {
+        _resultText = result['text'];
+        _hasAnalyzed = true;
+        _isAnalyzing = false;
+      });
+
+      // Wait a moment to show the result, then return
+      await Future.delayed(const Duration(milliseconds: 1500));
+      if (mounted) {
+        Navigator.pop(context, result);
+      }
+    } catch (e) {
+      setState(() {
+        _resultText = 'Error: $e';
+        _isAnalyzing = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Photo preview
+            Expanded(
+              child: Stack(
+                children: [
+                  // Image
+                  Center(
+                    child: Image.memory(
+                      widget.imageBytes,
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                  // Result overlay
+                  if (_hasAnalyzed && _resultText != null)
+                    Positioned(
+                      top: 20,
+                      left: 20,
+                      right: 20,
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.greenAccent,
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.greenAccent.withOpacity(0.3),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.check_circle,
+                              color: Colors.black,
+                              size: 28,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                _resultText!,
+                                style: const TextStyle(
+                                  color: Colors.black,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ],
+                    ),
+                ],
+              ),
+            ),
+            // Action buttons
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.grey[900],
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.5),
+                    blurRadius: 10,
+                    offset: const Offset(0, -2),
                   ),
-                );
-              },
+                ],
+              ),
+              child: Row(
+                children: [
+                  // Retake button
+                  Expanded(
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap:
+                            _isAnalyzing ? null : () => Navigator.pop(context),
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.3),
+                              width: 2,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(
+                                Icons.close,
+                                color: Colors.white,
+                                size: 24,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Retake',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  // Analyze button
+                  Expanded(
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: _isAnalyzing || _hasAnalyzed ? null : _analyze,
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          decoration: BoxDecoration(
+                            color:
+                                _hasAnalyzed ? Colors.grey : Colors.greenAccent,
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: _hasAnalyzed
+                                ? []
+                                : [
+                                    BoxShadow(
+                                      color:
+                                          Colors.greenAccent.withOpacity(0.3),
+                                      blurRadius: 10,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ],
+                          ),
+                          child: _isAnalyzing
+                              ? const Center(
+                                  child: SizedBox(
+                                    width: 24,
+                                    height: 24,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 3,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                          Colors.black),
+                                    ),
+                                  ),
+                                )
+                              : Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      _hasAnalyzed
+                                          ? Icons.check
+                                          : Icons.psychology,
+                                      color: Colors.black,
+                                      size: 24,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      _hasAnalyzed ? 'Done' : 'Analyze',
+                                      style: const TextStyle(
+                                        color: Colors.black,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
