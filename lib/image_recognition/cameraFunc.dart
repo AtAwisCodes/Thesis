@@ -277,6 +277,12 @@ class _cameraFuncState extends State<cameraFunc> {
       final Object inputBuffer = _buildInput(rgbBytes);
       final List<double> probs = _runInference(_interpreter!, inputBuffer);
 
+      // Debug: Print all probabilities for analysis
+      print('=== Model Predictions ===');
+      for (int i = 0; i < _labels.length; i++) {
+        print('${_labels[i]}: ${(probs[i] * 100).toStringAsFixed(2)}%');
+      }
+
       // Find best prediction
       int maxIdx = 0;
       double maxVal = probs[0];
@@ -287,17 +293,40 @@ class _cameraFuncState extends State<cameraFunc> {
         }
       }
 
-      const double threshold = 0.9;
-      final String text = (maxVal > threshold)
-          ? '${_labels[maxIdx]} ${(maxVal * 100).toStringAsFixed(1)}%'
-          : 'Uncertain... Try again';
+      print(
+          'Max prediction: ${_labels[maxIdx]} with ${(maxVal * 100).toStringAsFixed(2)}%');
 
-      final String label = maxVal > threshold ? _labels[maxIdx] : '';
+      // Higher threshold for real objects (PlasticBottles, Glass, Cardboard, Clothes)
+      // Even higher threshold for Empty class
+      const double objectThreshold = 0.85; // 85% confidence for real objects
+      const double emptyThreshold = 0.95; // 95% confidence for Empty
 
-      // Debug: Print detected label
-      if (label.isNotEmpty) {
-        print('Detected label: "$label"');
+      String text;
+      String label;
+
+      if (_labels[maxIdx] == 'Empty') {
+        // Empty class needs very high confidence
+        if (maxVal >= emptyThreshold) {
+          text = '${_labels[maxIdx]} ${(maxVal * 100).toStringAsFixed(1)}%';
+          label = _labels[maxIdx];
+        } else {
+          text = 'Uncertain... Try again or scan a recyclable object';
+          label = '';
+        }
+      } else {
+        // Regular objects need moderate-high confidence
+        if (maxVal >= objectThreshold) {
+          text = '${_labels[maxIdx]} ${(maxVal * 100).toStringAsFixed(1)}%';
+          label = _labels[maxIdx];
+        } else {
+          text = 'Uncertain... Try again or scan a recyclable object';
+          label = '';
+        }
       }
+
+      // Debug: Print final result
+      print(
+          'Final result: "$label" (confidence: ${(maxVal * 100).toStringAsFixed(2)}%)');
 
       return {
         'text': text,
