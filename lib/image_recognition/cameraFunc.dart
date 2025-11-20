@@ -307,7 +307,8 @@ class _cameraFuncState extends State<cameraFunc> {
       if (_labels[maxIdx] == 'Empty') {
         // Empty class needs very high confidence
         if (maxVal >= emptyThreshold) {
-          text = '${_labels[maxIdx]} ${(maxVal * 100).toStringAsFixed(1)}%';
+          text =
+              'Try another object (Plastic Bottles, Glass, Cardboard, and Clothes)';
           label = _labels[maxIdx];
         } else {
           text = 'Uncertain... Try again or scan a recyclable object';
